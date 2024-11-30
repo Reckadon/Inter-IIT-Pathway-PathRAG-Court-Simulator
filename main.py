@@ -1,6 +1,6 @@
 import pathway as pw
 from langchain.text_splitter import CharacterTextSplitter
-from pathway.xpacks.llm.vector_store import VectorStoreServer
+from pathway.xpacks.llm.vector_store import VectorStoreServer, VectorStoreClient
 import os
 import time
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -17,7 +17,7 @@ data_sources.append(
     )
 )
 
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=10, separator=" ")
 
 embeddings_model = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -25,15 +25,25 @@ embeddings_model = HuggingFaceEmbeddings(
 
 vector_server = VectorStoreServer.from_langchain_components(
     *data_sources,
-    embedder=embeddings_model,
     splitter=text_splitter,
+    embedder=embeddings_model,
 )
 
 if __name__ == "__main__":
     print("Starting VectorStoreServer...")
     vector_server.run_server(
-        host="0.0.0.0",
-        port=PATHWAY_PORT + 1,
+        host="127.0.0.1",
+        port=PATHWAY_PORT,
         threaded=True,
         with_cache=False,
     )
+    time.sleep(30)
+
+    print("\nmaking client...\n")
+    client = VectorStoreClient(
+        host="127.0.0.1",
+        port=PATHWAY_PORT,
+    )
+    query = "What is lorem?"
+    docs = client(query, k=1)
+    print(docs)

@@ -9,6 +9,6 @@ RUN pip install --no-cache-dir --upgrade pathway
 
 COPY . .
 
-EXPOSE 8766
+EXPOSE 8765
 
 CMD ["python", "./main.py"]
