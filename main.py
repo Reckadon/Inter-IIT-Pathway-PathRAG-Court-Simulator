@@ -1,12 +1,10 @@
 import pathway as pw
-from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
-from pathway.xpacks.llm.vector_store import  VectorStoreServer
+from pathway.xpacks.llm.vector_store import VectorStoreServer
 import os
-from dotenv import load_dotenv
 import time
-
-load_dotenv()
+from sentence_transformers import SentenceTransformer
+from langchain.embeddings import HuggingFaceEmbeddings
 
 PATHWAY_PORT = 8765
 
@@ -21,7 +19,9 @@ data_sources.append(
 )
 
 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-embeddings_model = OpenAIEmbeddings(openai_api_key=os.environ["OPENAI_API_KEY"])
+
+huggingface_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+embeddings_model = HuggingFaceEmbeddings(model=huggingface_model)
 
 vector_server = VectorStoreServer.from_langchain_components(
     *data_sources,
@@ -29,4 +29,4 @@ vector_server = VectorStoreServer.from_langchain_components(
     splitter=text_splitter,
 )
 vector_server.run_server(host="127.0.0.1", port=PATHWAY_PORT+1, threaded=True, with_cache=False)
-time.sleep(30)  # colab workaround
+time.sleep(30)
