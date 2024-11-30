@@ -4,7 +4,7 @@ from pathway.xpacks.llm.vector_store import VectorStoreServer
 import os
 import time
 from sentence_transformers import SentenceTransformer
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 PATHWAY_PORT = 8765
 
