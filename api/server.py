@@ -1,6 +1,6 @@
 import pathway as pw
 
-from legal_rag.api.endpoints import process_case#, search_legal_data
+from .endpoints import process_case
 
 def create_app():
     app = pw()

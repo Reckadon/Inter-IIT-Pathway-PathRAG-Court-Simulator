@@ -11,10 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Install the package in development mode
-RUN pip install -e .
+# RUN pip install -e .
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the API server
-CMD ["python", "-m", "api.server"]
+CMD ["python", "-m", "app"]

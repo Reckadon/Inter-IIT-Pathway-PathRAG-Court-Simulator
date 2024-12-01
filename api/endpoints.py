@@ -1,8 +1,8 @@
 from typing import Dict, Any
 from pydantic import BaseModel
-from legal_rag.core.workflow import TrialWorkflow
-from legal_rag.agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
-from legal_rag.tools.retrievers import create_law_retriever, create_web_retriever
+from core.workflow import TrialWorkflow
+from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
+from tools.retrievers import create_law_retriever, create_web_retriever
 
 # Initialize components
 law_retriever = create_law_retriever()

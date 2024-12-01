@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 
-from ..agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
+from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
 from .state import TrialState, TrialPhase
 from .pathway_store import PathwayVectorStore
 
