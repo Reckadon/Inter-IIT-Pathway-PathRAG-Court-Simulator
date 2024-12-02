@@ -9,7 +9,7 @@ PATHWAY_PORT = 8765
 
 
 class PathwayVectorStore:
-    def __init__(self, name, path, port):
+    def __init__(self, name = "pathway_vector_store", path="documents/lorem.md", port=PATHWAY_PORT):
         """Initialize the Store with the docs from given path"""
         self.name = name
         self.path = path
