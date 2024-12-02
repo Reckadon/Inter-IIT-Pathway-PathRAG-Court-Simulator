@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_TOKENS: int = 4000
     DEFAULT_MODEL: str = "gemini-pro"
     EMBEDDING_MODEL: str = "models/embedding-001"
+    GROQ_API_KEY: str
+    HUGGINGFACE_API_KEY: str
     
     class Config:
         env_file = ".env"
