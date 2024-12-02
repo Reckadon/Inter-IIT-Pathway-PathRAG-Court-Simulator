@@ -1,151 +1,184 @@
-from typing import Dict, Any, List, Optional
-from langchain.tools import BaseTool
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
-from tools.retrievers import create_law_retriever, create_web_retriever
+from typing import Dict, Any, List, Optional, TypedDict
+from langchain_core.messages import HumanMessage, SystemMessage
+from .base import BaseAgent, AgentState, AgentResponse
+from ..tools.retrievers import create_law_retriever, create_web_retriever
 
-class RetrieverAgent:
-    """Agent handling information retrieval from both legal documents and web"""
+class RetrievalResult(TypedDict):
+    """Structured retrieval result"""
+    findings: List[str]
+    sources: List[str]
+    relevance_scores: List[float]
+    calling_agent: str  # Track who requested the information
+
+class RetrieverAgent(BaseAgent):
+    """Agent for retrieving and analyzing information from various sources"""
     
     def __init__(
         self,
-        docs: List[Any],  # Documents to index
-        llm: Optional[ChatGoogleGenerativeAI] = None,
-        max_attempts: int = 3
+        docs: List[Any],
+        **kwargs
     ):
-        self.law_retriever = create_law_retriever(docs)
-        self.web_retriever = create_web_retriever()
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-pro",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
-        self.max_attempts = max_attempts
+        system_prompt = """You are an information retrieval specialist. Your role is to:
+        1. Analyze information requests carefully
+        2. Search appropriate sources (legal documents or web)
+        3. Evaluate source credibility
+        4. Assess information relevance
+        5. Format findings for legal context
         
-        self.system_prompt = """You are an information retrieval specialist for legal cases. Your role is to:
-        1. Analyze information needs and determine best source (legal documents or web)
-        2. Formulate effective search queries
-        3. Validate retrieved information for relevance and completeness
-        4. Reformulate queries if needed
-        5. Format information for legal context
-        6. Track and cite sources properly
-        
-        When searching legal documents:
-        - Focus on laws, statutes, and constitutional references
-        - Look for precedent cases
-        - Verify article and section numbers
-        
-        When searching web:
-        - Focus on recent case precedents
-        - Look for expert legal interpretations
-        - Verify source credibility
+        For each search:
+        - Determine best search strategy
+        - Use most relevant source
+        - Validate information accuracy
+        - Structure findings clearly
+        - Track information sources
         """
-    
-    async def retrieve_information(
-        self, 
-        query: str, 
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Retrieve and validate information from appropriate sources"""
-        
-        # Determine search strategy
-        strategy_response = await self._get_llm_response(
-            f"""Analyze this query and determine the best search strategy:
-            Query: {query}
-            Context: {context}
-            
-            Should we search legal documents (laws, statutes, constitution) or web sources?
-            Consider the type of information needed and provide your reasoning.
-            """
-        )
-        
-        search_strategy = self._parse_search_strategy(strategy_response)
-        
-        attempts = 0
-        while attempts < self.max_attempts:
-            # Generate optimized query
-            optimized_query = await self._get_llm_response(
-                f"""Formulate an effective search query based on:
-                Original Query: {query}
-                Search Strategy: {search_strategy}
-                Attempt: {attempts + 1} of {self.max_attempts}
-                Previous Results: {'None' if attempts == 0 else 'Insufficient'}
-                
-                Provide only the reformulated query without explanation.
-                """
-            )
-            
-            # Perform search based on strategy
-            if search_strategy["use_legal_docs"]:
-                results = await self.law_retriever.ainvoke(optimized_query)
-            else:
-                results = await self.web_retriever.ainvoke(optimized_query)
-            
-            # Validate results
-            validation = await self._get_llm_response(
-                f"""Validate these search results:
-                Original Query: {query}
-                Results: {results}
-                
-                Are these results sufficient and relevant? Consider:
-                1. Do they directly address the query?
-                2. Are the sources reliable?
-                3. Is the information complete?
-                4. Is additional information needed?
-                
-                Reply with either 'sufficient' or 'insufficient' followed by your reasoning.
-                """
-            )
-            
-            if "sufficient" in validation.lower():
-                return {
-                    "type": "information",
-                    "results": results,
-                    "source": "legal_docs" if search_strategy["use_legal_docs"] else "web",
-                    "query_history": [{
-                        "query": optimized_query,
-                        "attempt": attempts + 1
-                    }]
-                }
-            
-            attempts += 1
-        
-        return {
-            "type": "information_failure",
-            "message": "Could not find satisfactory information after maximum attempts",
-            "last_results": results,
-            "query_history": [{
-                "query": optimized_query,
-                "attempt": attempts
-            }]
-        }
-    
-    async def _get_llm_response(self, prompt: str) -> str:
-        """Get response from LLM"""
-        messages = [
-            HumanMessage(content=self.system_prompt),
-            HumanMessage(content=prompt)
+        # Create retrieval tools
+        tools = [
+            create_law_retriever(docs),
+            create_web_retriever()
         ]
-        response = await self.llm.ainvoke(messages)
-        return response.content
-    
-    def _parse_search_strategy(self, response: str) -> Dict[str, Any]:
-        """Parse agent's search strategy decision"""
-        use_legal_docs = any(term in response.lower() 
-                           for term in ["law", "statute", "constitution", "legal code"])
         
-        return {
-            "use_legal_docs": use_legal_docs,
-            "filters": {
-                "document_type": ["law", "statute", "constitution"] if use_legal_docs else None,
-                "jurisdiction": self._extract_jurisdiction(response)
-            }
-        }
+        super().__init__(system_prompt=system_prompt, tools=tools, **kwargs)
     
-    def _extract_jurisdiction(self, response: str) -> Optional[str]:
-        """Extract jurisdiction from agent's response"""
-        if "federal" in response.lower():
-            return "federal"
-        elif "state" in response.lower():
-            return "state"
-        return None
+    def get_thought_steps(self) -> List[str]:
+        """Get retriever-specific chain of thought steps"""
+        return [
+            "1. Analyze information request",
+            "2. Determine search strategy",
+            "3. Execute targeted search",
+            "4. Evaluate search results",
+            "5. Structure findings",
+            "6. Validate relevance"
+        ]
+    
+    async def process(self, state: AgentState) -> AgentResponse:
+        """Process current state with retriever-specific logic"""
+        # Extract calling agent from state
+        calling_agent = self._get_calling_agent(state["messages"])
+        
+        # Add retrieval context to state
+        messages = state["messages"] + [
+            SystemMessage(content=f"""
+                Information requested by: {calling_agent}
+                
+                Focus on:
+                1. Specific information requested
+                2. Context of the request
+                3. Required level of detail
+                4. Source credibility
+                5. Result relevance
+                
+                Structure findings for legal context.
+            """)
+        ]
+        
+        # Update state with retrieval context
+        state["messages"] = messages
+        
+        # Process through chain of thought
+        response = await super().process(state)
+        
+        # If chain of thought is complete, structure the findings
+        if response["cot_finished"]:
+            retrieval_result = self._structure_findings(
+                response["messages"][-1].content,
+                calling_agent
+            )
+            
+            # Format findings and add to messages
+            response["messages"].append(
+                HumanMessage(
+                    content=self._format_findings(retrieval_result),
+                    name="retriever"
+                )
+            )
+            
+            # Return control to calling agent
+            response["next"] = calling_agent
+        
+        return response
+    
+    def _determine_next_agent(self, result: Dict[str, Any]) -> str:
+        """Return control to the agent that requested information"""
+        return self._get_calling_agent(result["messages"])
+    
+    def _get_calling_agent(self, messages: List[Dict[str, Any]]) -> str:
+        """Determine which agent requested the information"""
+        # Look through recent messages in reverse
+        for message in reversed(messages):
+            if isinstance(message, dict) and "role" in message:
+                if message["role"] in ["lawyer", "prosecutor"]:
+                    return message["role"]
+            elif hasattr(message, "name"):
+                if message.name in ["lawyer", "prosecutor"]:
+                    return message.name
+        return "judge"  # Default to judge if can't determine
+    
+    def _structure_findings(self, content: str, calling_agent: str) -> RetrievalResult:
+        """Parse and structure the retrieval findings"""
+        findings: RetrievalResult = {
+            "findings": [],
+            "sources": [],
+            "relevance_scores": [],
+            "calling_agent": calling_agent
+        }
+        
+        content_lower = content.lower()
+        
+        # Extract findings
+        finding_markers = ["found that", "research shows", "source indicates", "according to"]
+        for marker in finding_markers:
+            if marker in content_lower:
+                start_idx = content_lower.index(marker)
+                end_idx = content.find(".", start_idx)
+                if end_idx != -1:
+                    finding = content[start_idx:end_idx].strip()
+                    findings["findings"].append(finding)
+                    
+                    # Look for source citation near the finding
+                    source_end = content.find(")", end_idx)
+                    if source_end != -1:
+                        source = content[end_idx+1:source_end].strip("( ")
+                        findings["sources"].append(source)
+                        
+                        # Assess relevance
+                        relevance = self._assess_relevance(finding)
+                        findings["relevance_scores"].append(relevance)
+        
+        return findings
+    
+    def _assess_relevance(self, finding: str) -> float:
+        """Assess relevance score of a finding"""
+        high_relevance = ["directly relates", "specifically addresses", "exactly matches"]
+        medium_relevance = ["related to", "pertains to", "relevant to"]
+        low_relevance = ["might relate", "could be relevant", "tangentially"]
+        
+        finding_lower = finding.lower()
+        
+        if any(term in finding_lower for term in high_relevance):
+            return 1.0
+        elif any(term in finding_lower for term in medium_relevance):
+            return 0.7
+        elif any(term in finding_lower for term in low_relevance):
+            return 0.3
+        return 0.5
+    
+    def _format_findings(self, findings: RetrievalResult) -> str:
+        """Format structured findings for presentation"""
+        formatted = [f"Information Retrieval Results (for {findings['calling_agent']}):\n"]
+        
+        for i, (finding, source, relevance) in enumerate(zip(
+            findings["findings"],
+            findings["sources"],
+            findings["relevance_scores"]
+        )):
+            relevance_label = "High" if relevance > 0.7 else "Medium" if relevance > 0.4 else "Low"
+            formatted.extend([
+                f"Finding {i+1}:",
+                f"- Content: {finding}",
+                f"- Source: {source}",
+                f"- Relevance: {relevance_label}",
+                ""
+            ])
+        
+        return "\n".join(formatted)
