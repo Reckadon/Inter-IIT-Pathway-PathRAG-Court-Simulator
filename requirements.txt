@@ -3,7 +3,8 @@ pydantic>=2.0.0
 pydantic-settings>=2.0.0
 langchain>=0.1.0
 langchain-google-genai>=0.0.5
-langchain-community>=0.0.10
+langchain-community
+langchain_huggingface
 langgraph>=0.0.10
 colorama>=0.4.6
 rich>=13.0.0

@@ -2,20 +2,19 @@ from typing import Dict, Any, List, Optional
 from langchain.tools import BaseTool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
-from ..core.pathway_store import PathwayVectorStore
+from tools.retrievers import create_law_retriever, create_web_retriever
 
 class RetrieverAgent:
     """Agent handling information retrieval from both legal documents and web"""
     
     def __init__(
         self,
-        vector_store: PathwayVectorStore,
-        web_search_tool: BaseTool,
+        docs: List[Any],  # Documents to index
         llm: Optional[ChatGoogleGenerativeAI] = None,
         max_attempts: int = 3
     ):
-        self.vector_store = vector_store
-        self.web_search_tool = web_search_tool
+        self.law_retriever = create_law_retriever(docs)
+        self.web_retriever = create_web_retriever()
         self.llm = llm or ChatGoogleGenerativeAI(
             model="gemini-pro",
             temperature=0,
@@ -78,12 +77,9 @@ class RetrieverAgent:
             
             # Perform search based on strategy
             if search_strategy["use_legal_docs"]:
-                results = await self._search_legal_documents(
-                    optimized_query,
-                    search_strategy.get("filters", {})
-                )
+                results = await self.law_retriever.ainvoke(optimized_query)
             else:
-                results = await self._search_web(optimized_query)
+                results = await self.web_retriever.ainvoke(optimized_query)
             
             # Validate results
             validation = await self._get_llm_response(
@@ -133,24 +129,6 @@ class RetrieverAgent:
         response = await self.llm.ainvoke(messages)
         return response.content
     
-    async def _search_legal_documents(
-        self,
-        query: str,
-        filters: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Search legal documents in vector store"""
-        results = await self.vector_store.similarity_search(
-            query,
-            k=4,
-            metadata_filter=self._build_metadata_filter(filters)
-        )
-        return self._format_results(results, source_type="legal")
-    
-    async def _search_web(self, query: str) -> List[Dict[str, Any]]:
-        """Search web using provided tool"""
-        results = await self.web_search_tool.ainvoke(query)
-        return self._format_results(results, source_type="web")
-    
     def _parse_search_strategy(self, response: str) -> Dict[str, Any]:
         """Parse agent's search strategy decision"""
         use_legal_docs = any(term in response.lower() 
@@ -164,40 +142,10 @@ class RetrieverAgent:
             }
         }
     
-    def _build_metadata_filter(self, filters: Dict[str, Any]) -> Optional[str]:
-        """Build metadata filter for vector store"""
-        filter_parts = []
-        
-        if doc_types := filters.get("document_type"):
-            type_conditions = [f"type == '{t}'" for t in doc_types]
-            filter_parts.append(f"({' || '.join(type_conditions)})")
-            
-        if jurisdiction := filters.get("jurisdiction"):
-            filter_parts.append(f"jurisdiction == '{jurisdiction}'")
-            
-        return " && ".join(filter_parts) if filter_parts else None
-    
-    def _format_results(
-        self,
-        results: List[Dict[str, Any]],
-        source_type: str
-    ) -> List[Dict[str, Any]]:
-        """Format results with consistent structure"""
-        formatted = []
-        for result in results:
-            formatted.append({
-                "content": result.get("content", result.get("text", "")),
-                "source": result.get("source", "Unknown"),
-                "source_type": source_type,
-                "metadata": result.get("metadata", {}),
-                "relevance_score": result.get("score", 0.0)
-            })
-        return formatted
-    
     def _extract_jurisdiction(self, response: str) -> Optional[str]:
         """Extract jurisdiction from agent's response"""
         if "federal" in response.lower():
             return "federal"
         elif "state" in response.lower():
             return "state"
-        return None 
+        return None

@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from ..core.state import TrialPhase
+from core.state import TrialPhase
 
 class TrialDisplay:
     """Handles real-time display of trial proceedings in the terminal"""

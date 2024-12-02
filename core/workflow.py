@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
 from .state import TrialState, TrialPhase
-from .pathway_store import PathwayVectorStore
+
 
 class TrialWorkflow:
     """Manages the trial workflow using LangGraph"""
@@ -14,15 +14,24 @@ class TrialWorkflow:
         lawyer: LawyerAgent,
         prosecutor: ProsecutorAgent,
         judge: JudgeAgent,
-        retriever: RetrieverAgent,
-        vector_store: Optional[PathwayVectorStore] = None
+        docs: List[Any],
+        retriever: Optional[RetrieverAgent] = None,
     ):
         self.lawyer = lawyer
         self.prosecutor = prosecutor
         self.judge = judge
-        self.retriever = retriever
-        self.vector_store = vector_store or PathwayVectorStore()
+        self.retriever = retriever or RetrieverAgent(docs=docs)
         self.graph = self._create_graph()
+    
+    def visualize_graph(self):
+        """Visualize the workflow graph using mermaid"""
+        try:
+            from IPython.display import Image, display
+            display(Image(self.graph.get_graph().draw_mermaid_png()))
+        except ImportError:
+            print("IPython display not available. Install IPython to visualize the graph.")
+        except Exception as e:
+            print(f"Failed to visualize graph: {str(e)}")
     
     def _create_graph(self) -> StateGraph:
         """Create the trial workflow graph"""

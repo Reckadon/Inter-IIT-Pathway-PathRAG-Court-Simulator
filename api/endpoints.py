@@ -2,20 +2,14 @@ from typing import Dict, Any
 from pydantic import BaseModel
 from core.workflow import TrialWorkflow
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
-from tools.retrievers import create_law_retriever, create_web_retriever
 
-# Initialize components
-law_retriever = create_law_retriever()
-web_retriever = create_web_retriever()
+docs = "docs"
 
 workflow = TrialWorkflow(
     lawyer=LawyerAgent(),
     prosecutor=ProsecutorAgent(),
     judge=JudgeAgent(),
-    retriever=RetrieverAgent(
-        vector_store_tool=law_retriever,
-        web_search_tool=web_retriever
-    )
+    retriever=RetrieverAgent(docs)
 )
 
 @serve_callable
