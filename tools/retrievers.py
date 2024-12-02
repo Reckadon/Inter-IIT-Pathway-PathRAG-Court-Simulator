@@ -17,13 +17,11 @@ def create_law_retriever(docs: List[Any]) -> BaseTool:
     #     google_api_key=settings.GOOGLE_API_KEY,
     #     task_type="retrieval_document"
     # )
-    vectorstore = PathwayVectorStore()
-    # vectorstore.initialize(embeddings=embeddings)
-    # vectorstore.add_item(docs)
+    public_store = PathwayVectorStore('public', './documents', 8765)
 
-    client = PathwayVectorClient(host=host, port=port)
+    public_client = public_store.get_client()
     
-    retriever = client.as_retriever()
+    retriever = public_client.as_retriever(search_type= "mmr")
 
     # Create retriever tool
     return create_retriever_tool(

@@ -40,7 +40,7 @@ class PathwayVectorStore:
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
 
-            print(f"making VectorStore: '{self.name}'...")
+            print(f"making VectorStore: '{self.name}'... using the docs { self.data_sources[0]}")
             self.vector_server = VectorStoreServer.from_langchain_components(
                 *self.data_sources,
                 splitter=text_splitter,
@@ -81,22 +81,21 @@ class PathwayVectorStore:
     #     else:
     #         self.inventory[item_name] = {'quantity': quantity, 'price': price}
 
-    def query_store(self, query_text):
+    def get_client(self):
         """
-        Query the vec store using the text provided.
-
-        Parameters:
-        query_text (str): The query.
+        get the client for the vector store.
 
         Returns:
-        
+        PathwayVectorClient
         """
-        docs = self.client.similarity_search(query_text, k=2)
-        return docs
+        return self.client
     
 
 
 
-if __name__ == "__main__":
-    public_db = PathwayVectorStore('public', './documents', 8765)
-    print(public_db.query_store("what is lorem"))
+if __name__ == "__main__":    # example usage
+    public_db = PathwayVectorStore('xyztest', './documents', 8765)
+    print('making a query')
+    result = public_db.get_client().as_retriever().invoke("using lorem")
+    for entry in result:
+        print(entry, "\n")
