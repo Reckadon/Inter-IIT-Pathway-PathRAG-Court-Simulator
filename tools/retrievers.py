@@ -21,7 +21,7 @@ def create_law_retriever(docs: List[Any]) -> BaseTool:
 
     public_client = public_store.get_client()
     
-    retriever = public_client.as_retriever(search_type= "mmr")
+    retriever = public_client.as_retriever()
 
     # Create retriever tool
     return create_retriever_tool(
