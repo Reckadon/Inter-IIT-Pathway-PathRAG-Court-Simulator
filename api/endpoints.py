@@ -12,6 +12,8 @@ workflow = TrialWorkflow(
     retriever=RetrieverAgent(docs)
 )
 
+workflow.visualize()
+
 @serve_callable
 async def process_case(case_details: Dict[str, Any]) -> Dict[str, Any]:
     """Process a legal case through the workflow"""

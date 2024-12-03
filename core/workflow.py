@@ -1,7 +1,10 @@
 from typing import Dict, Any, List, Optional, TypedDict, Literal
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START,  END
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
+# import matplotlib.pyplot as plt
+# import matplotlib.image as mpimg
+import os
 
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
 from .state import AgentState
@@ -14,13 +17,13 @@ class TrialWorkflow:
         lawyer: LawyerAgent,
         prosecutor: ProsecutorAgent,
         judge: JudgeAgent,
-        docs: List[Any],
-        retriever: Optional[RetrieverAgent] = None,
+        # docs: List[Any],
+        retriever: RetrieverAgent,
     ):
         self.lawyer = lawyer
         self.prosecutor = prosecutor
         self.judge = judge
-        self.retriever = retriever or RetrieverAgent(docs=docs)
+        self.retriever = retriever # or RetrieverAgent(docs=docs)
         self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
@@ -35,7 +38,7 @@ class TrialWorkflow:
         workflow.add_node("retriever", self._retriever_node)
         
         # Start with judge
-        workflow.add_edge("START", "judge")
+        workflow.add_edge(START, "judge")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -149,11 +152,23 @@ class TrialWorkflow:
     
     def visualize(self):
         """Visualize the workflow graph"""
-        try:
-            from IPython.display import Image, display
-            display(Image(self.graph.get_graph().draw_mermaid_png()))
-        except ImportError:
-            print("IPython display not available. Install IPython to visualize the graph.")
+
+        png_graph = self.graph.get_graph().draw_mermaid_png()
+        with open("my_graph.png", "wb") as f:
+            f.write(png_graph)
+
+        print(f"Graph saved as 'my_graph.png' in {os.getcwd()}")
+
+    #     # Clean up by removing the image file
+    #     # os.remove(graph_path)
+
+    # def visualize(self):
+    #     """Visualize the workflow graph"""
+    #     try:
+    #         from IPython.display import Image, display
+    #         display(Image(self.graph.get_graph().draw_mermaid_png()))
+    #     except ImportError:
+    #         print("IPython display not available. Install IPython to visualize the graph.")
 
 
 if __name__ == "__main__":
