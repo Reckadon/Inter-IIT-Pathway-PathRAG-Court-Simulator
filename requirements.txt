@@ -11,3 +11,7 @@ rich>=13.0.0
 python-dotenv>=1.0.0
 tavily-python>=0.1.9
 google-generativeai>=0.3.0
+crewai
+unstructured
+langchain_groq
+duckduckgo_search

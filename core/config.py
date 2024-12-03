@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "models/embedding-001"
     GROQ_API_KEY: str
     HUGGINGFACE_API_KEY: str
+    SERPER_API_KEY: str
     
     class Config:
         env_file = ".env"

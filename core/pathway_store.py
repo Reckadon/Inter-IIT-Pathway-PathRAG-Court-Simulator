@@ -40,14 +40,14 @@ class PathwayVectorStore:
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
 
-            print(f"making VectorStore: '{self.name}'... using the docs { self.data_sources[0]}")
+            print(f"\nmaking VectorStore: '{self.name}'...\n")
             self.vector_server = VectorStoreServer.from_langchain_components(
                 *self.data_sources,
                 splitter=text_splitter,
                 embedder=embeddings_model,
             )
 
-            print(f"Starting VectorStoreServer: '{self.name}'...")
+            # print(f"Starting VectorStoreServer: '{self.name}'...")
             self.vector_server.run_server(
                 host="127.0.0.1",
                 port=port,

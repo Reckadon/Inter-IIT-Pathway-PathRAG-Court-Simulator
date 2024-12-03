@@ -4,6 +4,7 @@ from .lawyer import LawyerAgent
 from .prosecutor import ProsecutorAgent
 from .judge import JudgeAgent
 from .retriever import RetrieverAgent
+from .kanoon_fetcher import FetchingAgent
 
 __all__ = [
     'BaseAgent',
@@ -11,4 +12,5 @@ __all__ = [
     'ProsecutorAgent',
     'JudgeAgent',
     'RetrieverAgent'
+    'FetchingAgent'
 ]

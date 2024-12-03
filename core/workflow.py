@@ -6,7 +6,7 @@ from pydantic import BaseModel
 # import matplotlib.image as mpimg
 import os
 
-from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent
+from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent
 from .state import AgentState
 
 class TrialWorkflow:
@@ -19,11 +19,13 @@ class TrialWorkflow:
         judge: JudgeAgent,
         # docs: List[Any],
         retriever: RetrieverAgent,
+        kanoon_fetcher: FetchingAgent
     ):
         self.lawyer = lawyer
         self.prosecutor = prosecutor
         self.judge = judge
         self.retriever = retriever # or RetrieverAgent(docs=docs)
+        self.kanoon_fetcher = kanoon_fetcher
         self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
@@ -32,13 +34,15 @@ class TrialWorkflow:
         workflow = StateGraph(AgentState)
         
         # Add agent nodes
+        workflow.add_node("kanoon_fetcher", self._kanoon_fetcher_node)
         workflow.add_node("judge", self._judge_node)
         workflow.add_node("lawyer", self._lawyer_node)
         workflow.add_node("prosecutor", self._prosecutor_node)
         workflow.add_node("retriever", self._retriever_node)
         
         # Start with judge
-        workflow.add_edge(START, "judge")
+        workflow.add_edge(START, "kanoon_fetcher")
+        workflow.add_edge("kanoon_fetcher", "judge")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -84,6 +88,10 @@ class TrialWorkflow:
         )
         
         return workflow.compile()
+    
+    async def _kanoon_fetcher_node(self, state: AgentState) -> AgentState:
+        """Kanoon Fetcher node processing"""
+        return await self.kanoon_fetcher.process(state)
     
     async def _judge_node(self, state: AgentState) -> AgentState:
         """Judge node processing"""
@@ -132,7 +140,7 @@ class TrialWorkflow:
             messages=[
                 HumanMessage(content=f"New case: {case_details['title']}\n\n{case_details['description']}")
             ],
-            next="judge",
+            next="kanoon_fetcher",
             thought_step=None,
             cot_finished=True
         )

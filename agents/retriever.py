@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional, TypedDict
 from langchain_core.messages import HumanMessage, SystemMessage
 from .base import BaseAgent, AgentState, AgentResponse
-from tools.retrievers import create_law_retriever, create_web_retriever
+from tools.retrievers import create_law_retriever
 
 class RetrievalResult(TypedDict):
     """Structured retrieval result"""
@@ -11,7 +11,7 @@ class RetrievalResult(TypedDict):
     calling_agent: str  # Track who requested the information
 
 class RetrieverAgent(BaseAgent):
-    """Agent for retrieving and analyzing information from various sources"""
+    """Agent for retrieving and analyzing information from Vector store"""
     
     def __init__(
         self,
@@ -35,7 +35,6 @@ class RetrieverAgent(BaseAgent):
         # Create retrieval tools
         tools = [
             create_law_retriever(docs),
-            create_web_retriever()
         ]
         
         super().__init__(system_prompt=system_prompt, tools=tools, **kwargs)
