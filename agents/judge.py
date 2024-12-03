@@ -17,7 +17,7 @@ class JudgeAgent(BaseAgent):
         2. Fact-check arguments thoroughly using evidence
         3. Request additional information when needed
         4. Keep track of argument strength and validity
-        5. Make a final verdict when sufficient arguments have been presented
+        5. When sufficient arguments have been presented, ask both lawyer and prosecutor to present their final arguments, then make a verdict
         
         For each argument you review:
         - Assess factual accuracy against evidence
