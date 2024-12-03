@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
+from langchain_core.messages import BaseMessage
 
 class TrialPhase(Enum):
     INITIALIZATION = "initialization"
@@ -10,13 +11,12 @@ class TrialPhase(Enum):
     COMPLETED = "completed"
 
 @dataclass
-class TrialState:
-    """State management for a single trial"""
-    trial_id: str
-    case_details: Dict[str, Any]
-    phase: TrialPhase = TrialPhase.INITIALIZATION
+class AgentState:
+    """State management for each agent in the trial workflow"""
+    messages: List[BaseMessage] = field(default_factory=list)
+    next: str = "judge"  # Default to judge as the next agent
+    thought_step: Optional[str] = None
+    cot_finished: bool = False
+    trial_phase: TrialPhase = TrialPhase.INITIALIZATION
     current_speaker: Optional[str] = None
-    messages: List[Dict[str, Any]] = field(default_factory=list)
-    evidence: List[Dict[str, Any]] = field(default_factory=list)
-    fact_checks: List[Dict[str, Any]] = field(default_factory=list)
     argument_count: int = 0
