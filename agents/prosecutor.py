@@ -7,18 +7,19 @@ from .base import AgentState
 from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 import os
+from langchain_core.messages.utils import get_buffer_string
 
 
 from dotenv import load_dotenv
 load_dotenv()
 
 
-class ProsecutorResponse(BaseModel):
-    """Structured prosecutor response"""
-    response: str = Field(description="The prosecutor's argument or response")
-    next_agent: Literal["self", "judge", "retriever"] = Field(
-        description="Next step in the legal process"
-    )
+# class ProsecutorResponse(BaseModel):
+#     """Structured prosecutor response"""
+#     response: str = Field(description="The prosecutor's argument or response")
+#     next_agent: Literal["self", "judge", "retriever"] = Field(
+#         description="Next step in the legal process"
+#     )
 
 class ProsecutorAgent:
     """Agent representing the prosecution"""
@@ -29,7 +30,7 @@ class ProsecutorAgent:
         tools: Optional[List[BaseTool]] = None,
         **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
         self.system_prompt = """You are a skilled prosecutor in a specialized AI-driven legal system. Your role is to present compelling arguments against the defendant while ensuring justice.
@@ -53,10 +54,7 @@ ROLE AND RESPONSIBILITIES:
    - Meet procedural requirements
    - Maintain prosecution standards
 
-AVAILABLE options for "next_agent":
-- "self": Continue your chain of thought
-- "judge": Present completed argument to judge
-- "retriever": Request additional evidence or legal reference
+
 
 PROSECUTION CRITERIA:
 1. Evidence Strength
@@ -120,21 +118,29 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
 
-        result = self.llm.with_structured_output(ProsecutorResponse).invoke(messages)
+        result = self.llm.invoke(messages)
         
-        if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
+        if state["thought_step"] == 0 or state["thought_step"] == 2:
             response = {
-                "messages": [HumanMessage(content=result.response, name="prosecutor")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=result.content, name="prosecutor")],
+                "next": "self",
                 "thought_step": state["thought_step"]+1,
                 "caller": "prosecutor"
             }
-        else:
+        elif state["thought_step"] == 1 :
             response = {
-                "messages": [HumanMessage(content=result.response, name="prosecutor")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=result.content, name="prosecutor")],
+                "next": "retriever",
+                "thought_step": 2
+            }
+        elif state["thought_step"] == 3:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="prosecutor")],
+                "next": "judge",
                 "thought_step": 0
             }
+        else:
+            raise ValueError("Invalid thought step")
             
         return response
     

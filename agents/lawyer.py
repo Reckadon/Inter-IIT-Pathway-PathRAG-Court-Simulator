@@ -12,12 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-class LawyerResponse(BaseModel):
-    """Structured lawyer response"""
-    response: str = Field(description="The lawyer's argument or response")
-    next_agent: Literal["self", "judge", "retriever"] = Field(
-        description="Next step in the legal process"
-    )
+# class LawyerResponse(BaseModel):
+#     """Structured lawyer response"""
+#     response: str = Field(description="The lawyer's argument or response")
+#     next_agent: Literal["self", "judge", "retriever"] = Field(
+#         description="Next step in the legal process"
+#     )
 
 class LawyerAgent:
     """Agent representing the defense counsel"""
@@ -52,10 +52,6 @@ ROLE AND RESPONSIBILITIES:
    - Address opposing arguments proactively
    - Maintain professional conduct
 
-AVAILABLE NEXT STEPS:
-- "self": Continue your chain of thought
-- "judge": Present completed argument to judge
-- "retriever": Request additional evidence or legal references
 
 ARGUMENT CRITERIA:
 1. Evidence Support
@@ -119,20 +115,27 @@ Remember: Your goal is to present the strongest possible defense while maintaini
         ] + state["messages"]
 
 
-        result = self.llm.with_structured_output(LawyerResponse).invoke(messages)
+        result = self.llm.invoke(messages)
         
-        if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
+        if state["thought_step"] == 0 or state["thought_step"] == 2:
             response = {
-                "messages": [HumanMessage(content=result.response, name="lawyer")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=result.content, name="lawyer")],
+                "next": "self",
                 "thought_step": state["thought_step"]+1,
                 "caller": "lawyer"
             }
-        else:
+        elif state["thought_step"] == 1:
             response = {
-                "messages": [HumanMessage(content=result.response, name="lawyer")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=result.content, name="lawyer")],
+                "next": "retriever",
+                "thought_step": 2
+            }
+        elif state["thought_step"] == 3:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="lawyer")],
+                "next": "judge",
                 "thought_step": 0
             }
-            
+        else:
+            raise ValueError("Invalid thought step")
         return response

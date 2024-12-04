@@ -8,6 +8,7 @@ from agents.base import AgentState
 from langchain_groq import ChatGroq
 import getpass
 import os
+
 # os.environ["GROQ_API_KEY"] = getpass.getpass()
 from dotenv import load_dotenv
 load_dotenv()
@@ -15,8 +16,8 @@ load_dotenv()
 class JudgeDecision(BaseModel):
     """Judge's structured decision output"""
     response: str = Field(description="The judge's response and comments")
-    next_agent: Literal["self", "lawyer", "prosecutor", "retriever", "END"] = Field(
-        description="Next agent to act in the trial"
+    next_agent: Literal["lawyer", "prosecutor", "END"] = Field(
+        description="Next agent to act in the trial or END if verdict is given in response"
     )
 
 class JudgeAgent:
@@ -52,12 +53,6 @@ ROLE AND RESPONSIBILITIES:
    - Evaluate when counter-arguments are needed
    - Assess when the trial is ready for a verdict
 
-AVAILABLE NEXT STEPS:
-- "lawyer": Direct the defense lawyer to present arguments or respond
-- "prosecutor": Allow the prosecutor to present charges or counter-arguments
-- "retriever": Request additional evidence or documentation
-- "self": Continue your own chain of thought
-- "END": Conclude the trial when sufficient evidence and arguments have been presented
 
 DECISION CRITERIA:
 1. Evidence Sufficiency
@@ -83,6 +78,10 @@ You will go through the following chain of thought steps :
 
 do only current step at a time.
 
+AVAILABLE NEXT STEPS at last step:
+- "lawyer": Direct the defense lawyer to present arguments or respond
+- "prosecutor": Allow the prosecutor to present charges or counter-arguments
+- "END": Conclude the trial when sufficient evidence and arguments have been presented
 Remember: Your primary goal is to ensure justice through a thorough, fair, and efficient trial process."""
         
 
@@ -119,32 +118,43 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
         """Process current state with judge-specific logic"""
 
        
-        if state["thought_step"] >= 0:
-            messages = [
-                {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
-            ] + state["messages"]
-        else:
-            messages = [
-                {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}
-            ] + state["messages"]
+        # if state["thought_step"] >= 0:
+        messages = [
+            {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
+        ] + state["messages"]
+        # else:
+        #     messages = [
+        #         {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}
+        #     ] + state["messages"]
 
-        print(f"prompt: {messages}")
-        result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
+        # print(f"prompt: {messages}")
+        if state["thought_step"] != 3:
+            result = self.llm.invoke(messages)
+        else:
+            result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        if (0 <= state["thought_step"] < len(self.get_thought_steps())-1) and (result.next_agent != "lawyer" or result.next_agent != "prosecutor"):
+        if state["thought_step"] == 0 or state["thought_step"] == 2:
             response = {
-                "messages": [HumanMessage(content=result.response, name="judge")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=result.content, name="judge")],
+                "next": "self",
                 "thought_step": state["thought_step"]+1,
                 "caller": "judge"
             }
-        else:
+        elif state["thought_step"] == 1:
             response = {
-                "messages": [HumanMessage(content=result.response, name="judge") ],
+                "messages": [HumanMessage(content=result.content, name="judge") ],
+                "next": "retriever",
+                "thought_step": 2
+            }
+        elif state["thought_step"] == 3:
+            response = {
+                "messages": [HumanMessage(content=result.response, name="judge")],
                 "next": result.next_agent,
                 "thought_step": 0
             }
-          
+        else:
+            raise ValueError("Invalid thought step")
+
         return response
     
     # def _parse_judge_decision(self, content: str) -> JudgeDecision:

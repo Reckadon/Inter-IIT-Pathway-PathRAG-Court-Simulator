@@ -20,14 +20,15 @@ def create_law_retriever() -> BaseTool:
 
     public_client = public_store.get_client()
     
-    retriever = public_client.as_retriever(search_type= "mmr")
+    retriever = public_client.as_retriever()
 
+    return retriever
     # Create retriever tool
-    return create_retriever_tool(
-        retriever,
-        "search_laws",
-        "Search through laws, statutes, and constitution documents"
-    )
+    # return create_retriever_tool(
+    #     retriever,
+    #     "search_laws",
+    #     "Search through laws, statutes, and constitution documents"
+    # )
 class RetrieverResponse(BaseModel):
     """Structured retriever response"""
     response: str = Field(description="The retriever's assessment of the retrieved content")
@@ -39,12 +40,12 @@ class RetrieverAgent:
     
     def __init__(
         self,
-        vector_store_retriever: Any,
+        # vector_store_retriever: Any,
         llm: Optional[BaseChatModel] = None,
         **kwargs
     ):
-        self.vector_store_retriever = vector_store_retriever or create_law_retriever()
-        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.vector_store_retriever = create_law_retriever()
+        self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
         
         self.system_prompt = """You are a legal document retrieval specialist. Your role is to find relevant legal information from a database of laws, statutes, and precedents.
 
@@ -134,21 +135,21 @@ Remember: Your goal is to find the most relevant legal information. If results a
         
         for i in range(5): # max 5 iterations
             #formulate query
-            messages.append({"role": "system", "content": "need_info: " + get_buffer_string(info_analysis) + "\n" + "current_task: " + self.get_thought_steps()[1]})
+            messages.append({"role": "system", "content": "need_info: " + info_analysis.content + "\n" + "current_task: " + self.get_thought_steps()[1]})
             query = self.llm.invoke(messages)
 
             #retrieve
-            retrieved_content = self.vector_store_retriever.invoke(get_buffer_string(query))
+            retrieved_content = self.vector_store_retriever.invoke(query.content)
 
             #assess
-            messages.append({"role": "system", "content": "retrieved_content: " + get_buffer_string(retrieved_content) + "\n" + "current_task: " + self.get_thought_steps()[2]})
+            messages.append({"role": "system", "content": "retrieved_content: " + retrieved_content.content + "\n" + "current_task: " + self.get_thought_steps()[2]})
             assessment = self.llm.with_structured_output(RetrieverResponse).invoke(messages)
 
             #continue
             if assessment.is_enough:
                 break
         
-        messages.append({"role": "system", "content": "assessment: " + get_buffer_string(assessment.response) + "\n" + "current_task: " + self.get_thought_steps()[3]})
+        messages.append({"role": "system", "content": "assessment: " + assessment.response + "\n" + "current_task: " + self.get_thought_steps()[3]})
         result = self.llm.invoke(messages)
 
         

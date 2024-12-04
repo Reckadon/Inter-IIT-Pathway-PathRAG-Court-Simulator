@@ -137,7 +137,7 @@ class TrialWorkflow:
                 HumanMessage(content=f"New case: {case_details['title']}\n\n{case_details['description']}")
             ],
             next="judge",
-            thought_step=-1,
+            thought_step=0,
             # cot_finished=True
         )
         
