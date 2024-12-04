@@ -15,7 +15,7 @@ load_dotenv()
 class JudgeDecision(BaseModel):
     """Judge's structured decision output"""
     response: str = Field(description="The judge's response and comments")
-    next_step: Literal["self", "lawyer", "prosecutor", "retriever", "END"] = Field(
+    next_agent: Literal["self", "lawyer", "prosecutor", "retriever", "END"] = Field(
         description="Next agent to act in the trial"
     )
 
@@ -23,7 +23,7 @@ class JudgeAgent:
     """Agent representing the judge who manages the trial flow"""
     
     def __init__(
-        self,
+        self,  
         llm: Optional[BaseChatModel] = None,
         tools: Optional[List[BaseTool]] = None,
         **kwargs
@@ -121,27 +121,27 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
        
         if state["thought_step"] >= 0:
             messages = [
-                {"role": "system", "content": self.system_prompt + f"'current_task': {self.get_thought_steps()[state["thought_step"]]}"}
+                {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
             ] + state["messages"]
         else:
             messages = [
-                {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}}
+                {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}
             ] + state["messages"]
 
         print(f"prompt: {messages}")
         result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        if (0 <= state["thought_step"] < len(self.get_thought_steps())-1) and (result.next_step != "lawyer" or result.next_step != "prosecutor"):
+        if (0 <= state["thought_step"] < len(self.get_thought_steps())-1) and (result.next_agent != "lawyer" or result.next_agent != "prosecutor"):
             response = {
                 "messages": [HumanMessage(content=result.response, name="judge")],
-                "next": result.next_step,
+                "next": result.next_agent,
                 "thought_step": state["thought_step"]+1,
                 "caller": "judge"
             }
         else:
             response = {
                 "messages": [HumanMessage(content=result.response, name="judge") ],
-                "next": result.next_step,
+                "next": result.next_agent,
                 "thought_step": 0
             }
           

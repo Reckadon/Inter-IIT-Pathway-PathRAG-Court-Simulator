@@ -15,7 +15,7 @@ load_dotenv()
 class LawyerResponse(BaseModel):
     """Structured lawyer response"""
     response: str = Field(description="The lawyer's argument or response")
-    next_step: Literal["self", "judge", "retriever"] = Field(
+    next_agent: Literal["self", "judge", "retriever"] = Field(
         description="Next step in the legal process"
     )
 
@@ -114,30 +114,24 @@ Remember: Your goal is to present the strongest possible defense while maintaini
     async def process(self, state: AgentState) -> AgentState:
         """Process current state with lawyer-specific logic"""
         
-        # if state["thought_step"] >= 0:
         messages = [
-            {"role": "system", "content": self.system_prompt, 
-                 "current_task": self.get_thought_steps()[state["thought_step"]]},
+            {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
-        # else:
-        #     messages = [
-        #         {"role": "lawyer", "content": self.system_prompt, 
-        #          "current_task": "Initial case review and strategy planning"}
-        #     ] + state["messages"]
+
 
         result = self.llm.with_structured_output(LawyerResponse).invoke(messages)
         
         if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
             response = {
                 "messages": [HumanMessage(content=result.response, name="lawyer")],
-                "next": result.next_step,
+                "next": result.next_agent,
                 "thought_step": state["thought_step"]+1,
                 "caller": "lawyer"
             }
         else:
             response = {
                 "messages": [HumanMessage(content=result.response, name="lawyer")],
-                "next": result.next_step,
+                "next": result.next_agent,
                 "thought_step": 0
             }
             

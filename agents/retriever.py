@@ -1,11 +1,14 @@
-from typing import Any, List, Optional, TypedDict
+from typing import Any, List, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
 from langchain.tools.retriever import create_retriever_tool
 from core.pathway_store import PathwayVectorStore
 from .base import AgentState
 from langchain_groq import ChatGroq
+from langchain_core.messages.utils import get_buffer_string
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,10 +28,10 @@ def create_law_retriever() -> BaseTool:
         "search_laws",
         "Search through laws, statutes, and constitution documents"
     )
-class RetrieverResponse(TypedDict):
+class RetrieverResponse(BaseModel):
     """Structured retriever response"""
-    response: str
-    is_enough: bool
+    response: str = Field(description="The retriever's assessment of the retrieved content")
+    is_enough: bool = Field(description="Whether the retrieved content is enough to answer the request")
 
 
 class RetrieverAgent:
@@ -122,42 +125,30 @@ Remember: Your goal is to find the most relevant legal information. If results a
         """Process current state with retriever-specific logic"""
         
         messages = [
-            {"role": "system", "content": self.system_prompt, 
-             "current_task": self.get_thought_steps()[0]},
+            {"role": "system", "content": self.system_prompt + f"\n'current_task': {self.get_thought_steps()[0]}"}
         ] + state["messages"]
 
         info_analysis = self.llm.invoke(messages)
 
-        # # Execute search if in query formulation phase
-        # if state["thought_step"] == 1:  # QUERY FORMULATION & RETRIEVAL
-        #     query = self._extract_query(messages[-1]["content"])
-        #     vector_results = await self.vector_store.similarity_search(query)
             
-        #     # Add results to messages
-        #     messages.append({
-        #         "role": "system",
-        #         "content": f"Retrieved Documents:\n{vector_results}"
-        #     })
-
-        # result = self.llm.with_structured_output(RetrieverResponse).invoke(messages)
-
+        
         for i in range(5): # max 5 iterations
             #formulate query
-            messages.append({"need_info": info_analysis, "current_task": self.get_thought_steps()[1]})
+            messages.append({"role": "system", "content": "need_info: " + get_buffer_string(info_analysis) + "\n" + "current_task: " + self.get_thought_steps()[1]})
             query = self.llm.invoke(messages)
 
             #retrieve
-            retrieved_content = self.vector_store_retriever.invoke(query)
+            retrieved_content = self.vector_store_retriever.invoke(get_buffer_string(query))
 
             #assess
-            messages.append({"current_task": self.get_thought_steps()[2], "retrieved_content": retrieved_content})
+            messages.append({"role": "system", "content": "retrieved_content: " + get_buffer_string(retrieved_content) + "\n" + "current_task: " + self.get_thought_steps()[2]})
             assessment = self.llm.with_structured_output(RetrieverResponse).invoke(messages)
 
             #continue
-            if assessment["is_enough"]:
+            if assessment.is_enough:
                 break
         
-        messages.append({"current_task": self.get_thought_steps()[3], "assessment": assessment})
+        messages.append({"role": "system", "content": "assessment: " + get_buffer_string(assessment.response) + "\n" + "current_task: " + self.get_thought_steps()[3]})
         result = self.llm.invoke(messages)
 
         
