@@ -22,4 +22,8 @@ _Use the same name as above_
 
 ---
 
+
+## References
+Indian Penal Code PDF: [link](https://www.iitk.ac.in/wc/data/IPC_186045.pdf)
+PDF Parsing reference: [Multimodal RAG for PDFs with Text, Images, and Charts](https://pathway.com/developers/templates/multimodal-rag)
 Vector store reference: [Data Indexing](https://pathway.com/developers/user-guide/llm-xpack/vectorstore_pipeline/)
