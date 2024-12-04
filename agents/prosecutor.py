@@ -4,11 +4,21 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
 from .base import AgentState
+from pydantic import BaseModel, Field
+from langchain_groq import ChatGroq
+import os
 
-class ProsecutorResponse(TypedDict):
+
+from dotenv import load_dotenv
+load_dotenv()
+
+
+class ProsecutorResponse(BaseModel):
     """Structured prosecutor response"""
-    response: str
-    next_step: Literal["self", "judge", "retriever"]
+    response: str = Field(description="The prosecutor's argument or response")
+    next_step: Literal["self", "judge", "retriever"] = Field(
+        description="Next step in the legal process"
+    )
 
 class ProsecutorAgent:
     """Agent representing the prosecution"""
@@ -19,11 +29,7 @@ class ProsecutorAgent:
         tools: Optional[List[BaseTool]] = None,
         **kwargs
     ):
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-8b",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
+        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
         self.system_prompt = """You are a skilled prosecutor in a specialized AI-driven legal system. Your role is to present compelling arguments against the defendant while ensuring justice.
@@ -47,10 +53,10 @@ ROLE AND RESPONSIBILITIES:
    - Meet procedural requirements
    - Maintain prosecution standards
 
-AVAILABLE NEXT STEPS:
+AVAILABLE options for "next_step":
 - "self": Continue your chain of thought
 - "judge": Present completed argument to judge
-- "retriever": Request additional evidence or legal references
+- "retriever": Request additional evidence or legal reference
 
 PROSECUTION CRITERIA:
 1. Evidence Strength
@@ -92,7 +98,7 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
             "   - Identify applicable laws and precedents\n" +
             "   - Structure legal requirements\n" +
             "   - Plan evidence presentation\n" +
-            "   - Consider procedural requirements",
+            "   - set 'next_step' as 'retriever'",
 
             "3. ARGUMENT CONSTRUCTION:\n" +
             "   - Build systematic prosecution case\n" +
@@ -112,7 +118,7 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
         
         # if state["thought_step"] >= 0:
         messages = [
-            {"role": "human", "content": self.system_prompt, 
+            {"role": "system", "content": self.system_prompt, 
                  "current_task": self.get_thought_steps()[state["thought_step"]]},
         ] + state["messages"]
         # else:
@@ -125,15 +131,15 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
         
         if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
             response = {
-                "messages": [HumanMessage(content=result["response"], name="prosecutor")],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="prosecutor")],
+                "next": result.next_step,
                 "thought_step": state["thought_step"]+1,
                 "caller": "prosecutor"
             }
         else:
             response = {
-                "messages": [HumanMessage(content=result["response"], name="prosecutor")],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="prosecutor")],
+                "next": result.next_step,
                 "thought_step": 0
             }
             

@@ -5,6 +5,10 @@ from langchain.tools import BaseTool
 from langchain.tools.retriever import create_retriever_tool
 from core.pathway_store import PathwayVectorStore
 from .base import AgentState
+from langchain_groq import ChatGroq
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def create_law_retriever() -> BaseTool:
@@ -37,11 +41,7 @@ class RetrieverAgent:
         **kwargs
     ):
         self.vector_store_retriever = vector_store_retriever or create_law_retriever()
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-8b",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
+        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
         
         self.system_prompt = """You are a legal document retrieval specialist. Your role is to find relevant legal information from a database of laws, statutes, and precedents.
 
@@ -122,7 +122,7 @@ Remember: Your goal is to find the most relevant legal information. If results a
         """Process current state with retriever-specific logic"""
         
         messages = [
-            {"role": "tool", "content": self.system_prompt, 
+            {"role": "system", "content": self.system_prompt, 
              "current_task": self.get_thought_steps()[0]},
         ] + state["messages"]
 

@@ -12,6 +12,8 @@ class AgentState(MessagesState):
     thought_step: Optional[int] = 0  # Current step in chain of thought
     caller: Optional[str] = None  # Who called the agent
 
+
+
 # class AgentResponse(TypedDict):
 #     """Standard response format for agents"""
 #     messages: List[BaseMessage]

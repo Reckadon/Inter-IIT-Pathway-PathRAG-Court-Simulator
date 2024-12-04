@@ -4,11 +4,20 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
 from .base import AgentState
+from pydantic import BaseModel, Field
+from langchain_groq import ChatGroq
+import os
 
-class LawyerResponse(TypedDict):
+from dotenv import load_dotenv
+load_dotenv()
+
+
+class LawyerResponse(BaseModel):
     """Structured lawyer response"""
-    response: str
-    next_step: Literal["self", "judge", "retriever"]
+    response: str = Field(description="The lawyer's argument or response")
+    next_step: Literal["self", "judge", "retriever"] = Field(
+        description="Next step in the legal process"
+    )
 
 class LawyerAgent:
     """Agent representing the defense counsel"""
@@ -19,11 +28,7 @@ class LawyerAgent:
         tools: Optional[List[BaseTool]] = None,
         **kwargs
     ):
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-8b",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
+        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
         self.system_prompt = """You are a skilled defense attorney in a specialized AI-driven legal system. Your role is to build and present compelling arguments for your client.
@@ -111,7 +116,7 @@ Remember: Your goal is to present the strongest possible defense while maintaini
         
         # if state["thought_step"] >= 0:
         messages = [
-            {"role": "human", "content": self.system_prompt, 
+            {"role": "system", "content": self.system_prompt, 
                  "current_task": self.get_thought_steps()[state["thought_step"]]},
         ] + state["messages"]
         # else:
@@ -124,15 +129,15 @@ Remember: Your goal is to present the strongest possible defense while maintaini
         
         if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
             response = {
-                "messages": [HumanMessage(content=result["response"], name="lawyer")],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="lawyer")],
+                "next": result.next_step,
                 "thought_step": state["thought_step"]+1,
                 "caller": "lawyer"
             }
         else:
             response = {
-                "messages": [HumanMessage(content=result["response"], name="lawyer")],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="lawyer")],
+                "next": result.next_step,
                 "thought_step": 0
             }
             

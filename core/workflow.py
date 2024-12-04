@@ -35,7 +35,7 @@ class TrialWorkflow:
         workflow.add_node("retriever", self._retriever_node)
         
         # Start with judge
-        workflow.add_edge(START, "judge")
+        workflow.add_edge(START, "prosecutor")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -116,17 +116,17 @@ class TrialWorkflow:
     def _route_from_agent(self, state: AgentState) -> str:
         """Route from lawyer or prosecutor"""
         # Check for Chain of Thought continuation
-        if not state["cot_finished"]:
-            return "self"
+        # if not state["cot_finished"]:
+        #     return "self"
         return state["next"]
     
     def _route_from_retriever(self, state: AgentState) -> str:
         """Route from retriever back to calling agent"""
         # Get the last message to determine calling agent
-        for msg in reversed(state["messages"]):
-            if hasattr(msg, "name"):
-                if msg.name in ["lawyer", "prosecutor"]:
-                    return msg.name
+        # for msg in reversed(state["messages"]):
+        #     if hasattr(msg, "name"):
+        #         if msg.name in ["lawyer", "prosecutor"]:
+        #             return msg.name
         return "judge"  # Default to judge if can't determine
     
     async def run(self, case_details: Dict[str, Any]) -> Dict[str, Any]:

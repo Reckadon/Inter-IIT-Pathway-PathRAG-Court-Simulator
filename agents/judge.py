@@ -3,12 +3,21 @@ from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
 from agents.base import AgentState
+from langchain_groq import ChatGroq
+import getpass
+import os
+# os.environ["GROQ_API_KEY"] = getpass.getpass()
+from dotenv import load_dotenv
+load_dotenv()
 
-class JudgeDecision(TypedDict):
-    """Judge's decision on next steps"""
-    response: str
-    next_step:  Literal["self", "lawyer", "prosecutor", "retriever", "END"]
+class JudgeDecision(BaseModel):
+    """Judge's structured decision output"""
+    response: str = Field(description="The judge's response and comments")
+    next_step: Literal["self", "lawyer", "prosecutor", "retriever", "END"] = Field(
+        description="Next agent to act in the trial"
+    )
 
 class JudgeAgent:
     """Agent representing the judge who manages the trial flow"""
@@ -19,11 +28,7 @@ class JudgeAgent:
         tools: Optional[List[BaseTool]] = None,
         **kwargs
     ):
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-8b",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
+        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
         self.system_prompt = """You are an impartial judge presiding over a legal trial in a specialized AI-driven legal system. Your role is critical in ensuring fair proceedings and making informed decisions.
@@ -116,27 +121,27 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
        
         if state["thought_step"] >= 0:
             messages = [
-                {"role": "human", "content": self.system_prompt, "current_task": self.get_thought_steps()[state["thought_step"]]},
+                {"role": "system", "content": self.system_prompt + f"'current_task': {self.get_thought_steps()[state["thought_step"]]}"}
             ] + state["messages"]
         else:
             messages = [
-                {"role": "human ", "content": self.system_prompt, "current_task": "Start of trial, choose the first speaker"}
+                {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}}
             ] + state["messages"]
 
-
+        print(f"prompt: {messages}")
         result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
+        if (0 <= state["thought_step"] < len(self.get_thought_steps())-1) and (result.next_step != "lawyer" or result.next_step != "prosecutor"):
             response = {
-                "messages": [HumanMessage(content=result["response"], name="judge")],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="judge")],
+                "next": result.next_step,
                 "thought_step": state["thought_step"]+1,
                 "caller": "judge"
             }
         else:
             response = {
-                "messages": [HumanMessage(content=result["response"], name="judge") ],
-                "next": result["next_step"],
+                "messages": [HumanMessage(content=result.response, name="judge") ],
+                "next": result.next_step,
                 "thought_step": 0
             }
           
