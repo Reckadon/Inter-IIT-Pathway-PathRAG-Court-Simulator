@@ -7,13 +7,13 @@ import asyncio
 if __name__ == "__main__":
     print("running the app.py file...\n")
     # main()
-    docs = "/documents"
+    # docs = "/documents"
 
     workflow = TrialWorkflow(
         lawyer=LawyerAgent(),
         prosecutor=ProsecutorAgent(),
         judge=JudgeAgent(),
-        retriever=RetrieverAgent(docs),
+        retriever=RetrieverAgent(),
         kanoon_fetcher = FetchingAgent()
     )
 

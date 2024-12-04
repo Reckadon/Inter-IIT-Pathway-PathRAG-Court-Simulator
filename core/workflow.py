@@ -146,7 +146,7 @@ class TrialWorkflow:
                 HumanMessage(content=f"New case: {case_details['title']}\n\n{case_details['description']}")
             ],
             next="kanoon_fetcher",
-            thought_step=None,
+            thought_step=0,
             # cot_finished=True
         )
         
