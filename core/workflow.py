@@ -2,8 +2,6 @@ from typing import Dict, Any, List, Optional, TypedDict, Literal
 from langgraph.graph import StateGraph, START,  END
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
-# import matplotlib.pyplot as plt
-# import matplotlib.image as mpimg
 import os
 
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent
@@ -17,7 +15,6 @@ class TrialWorkflow:
         lawyer: LawyerAgent,
         prosecutor: ProsecutorAgent,
         judge: JudgeAgent,
-        # docs: List[Any],
         retriever: RetrieverAgent,
         kanoon_fetcher: FetchingAgent
     ):
@@ -51,6 +48,8 @@ class TrialWorkflow:
             {
                 "lawyer": "lawyer",
                 "prosecutor": "prosecutor",
+                "retriever": "retriever",
+                "self": "judge",
                 "END": END
             }
         )
@@ -83,7 +82,8 @@ class TrialWorkflow:
             self._route_from_retriever,
             {
                 "lawyer": "lawyer",
-                "prosecutor": "prosecutor"
+                "prosecutor": "prosecutor",
+                "judge": "judge"
             }
         )
         
@@ -95,42 +95,46 @@ class TrialWorkflow:
     
     async def _judge_node(self, state: AgentState) -> AgentState:
         """Judge node processing"""
+        print(f"Judge node processing with state: {state}")
         return await self.judge.process(state)
     
     async def _lawyer_node(self, state: AgentState) -> AgentState:
         """Lawyer node processing"""
+        print(f"Lawyer node processing with state: {state}")
         return await self.lawyer.process(state)
     
     async def _prosecutor_node(self, state: AgentState) -> AgentState:
         """Prosecutor node processing"""
+        print(f"Prosecutor node processing with state: {state}")
         return await self.prosecutor.process(state)
     
     async def _retriever_node(self, state: AgentState) -> AgentState:
         """Retriever node processing"""
+        print(f"Retriever node processing with state: {state}")
         return await self.retriever.process(state)
     
     def _route_from_judge(self, state: AgentState) -> str:
         """Route based on judge's decision"""
         # Check if verdict is ready
-        if any("verdict" in msg.content.lower() 
-               for msg in state["messages"] if hasattr(msg, "content")):
-            return "END"
+        # if any("verdict" in msg.content.lower() 
+        #        for msg in state["messages"] if hasattr(msg, "content")):
+        #     return "END"
         return state["next"]
     
     def _route_from_agent(self, state: AgentState) -> str:
         """Route from lawyer or prosecutor"""
         # Check for Chain of Thought continuation
-        if not state["cot_finished"]:
-            return "self"
+        # if not state["cot_finished"]:
+        #     return "self"
         return state["next"]
     
     def _route_from_retriever(self, state: AgentState) -> str:
         """Route from retriever back to calling agent"""
         # Get the last message to determine calling agent
-        for msg in reversed(state["messages"]):
-            if hasattr(msg, "name"):
-                if msg.name in ["lawyer", "prosecutor"]:
-                    return msg.name
+        # for msg in reversed(state["messages"]):
+        #     if hasattr(msg, "name"):
+        #         if msg.name in ["lawyer", "prosecutor"]:
+        #             return msg.name
         return "judge"  # Default to judge if can't determine
     
     async def run(self, case_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -179,6 +183,3 @@ class TrialWorkflow:
     #         print("IPython display not available. Install IPython to visualize the graph.")
 
 
-if __name__ == "__main__":
-    workflow = TrialWorkflow(lawyer, prosecutor, judge, docs)
-    workflow.visualize() 

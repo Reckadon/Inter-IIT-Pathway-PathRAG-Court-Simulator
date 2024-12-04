@@ -1,132 +1,207 @@
 from typing import Dict, Any, List, Optional, Literal, TypedDict
-from langchain_core.messages import HumanMessage, SystemMessage
-from .base import BaseAgent, AgentState, AgentResponse
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
+from agents.base import AgentState
+from langchain_groq import ChatGroq
+import getpass
+import os
 
-class JudgeDecision(TypedDict):
-    """Judge's decision on next steps"""
-    next_agent: Literal["lawyer", "prosecutor", "retriever", "END"]
-    reasoning: str
-    fact_check: Optional[Dict[str, Any]]
+# os.environ["GROQ_API_KEY"] = getpass.getpass()
+from dotenv import load_dotenv
+load_dotenv()
 
-class JudgeAgent(BaseAgent):
+class JudgeDecision(BaseModel):
+    """Judge's structured decision output"""
+    response: str = Field(description="The judge's response and comments")
+    next_agent: Literal["lawyer", "prosecutor", "END"] = Field(
+        description="Next agent to act in the trial or END if verdict is given in response"
+    )
+
+class JudgeAgent:
     """Agent representing the judge who manages the trial flow"""
     
-    def __init__(self, **kwargs):
-        system_prompt = """You are an impartial judge managing a legal trial. Your role is to:
-        1. Ensure fair trial proceedings by alternating between lawyer and prosecutor
-        2. Fact-check arguments thoroughly using evidence
-        3. Request additional information when needed
-        4. Keep track of argument strength and validity
-        5. Make a final verdict when sufficient arguments have been presented
+    def __init__(
+        self,  
+        llm: Optional[BaseChatModel] = None,
+        tools: Optional[List[BaseTool]] = None,
+        **kwargs
+    ):
+        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.tools = tools or []
         
-        For each argument you review:
-        - Assess factual accuracy against evidence
-        - Check logical consistency
-        - Evaluate if more information is needed
-        - Determine if counter-arguments are needed
-        - Consider if the trial is ready for verdict
-        """
-        super().__init__(system_prompt=system_prompt, **kwargs)
-    
+        self.system_prompt = """You are an impartial judge presiding over a legal trial in a specialized AI-driven legal system. Your role is critical in ensuring fair proceedings and making informed decisions.
+
+ROLE AND RESPONSIBILITIES:
+1. Trial Management
+   - Maintain order and fairness in proceedings
+   - Ensure balanced participation between lawyer and prosecutor
+   - Monitor the logical flow and coherence of arguments
+   - Prevent repetitive or circular arguments
+
+2. Evidence Evaluation
+   - Assess the credibility and relevance of presented evidence
+   - Verify factual claims against available documentation
+   - Request additional evidence when necessary
+   - Identify gaps in evidence that need addressing
+
+3. Decision Making
+   - Make informed decisions about trial progression
+   - Determine when sufficient evidence has been presented
+   - Evaluate when counter-arguments are needed
+   - Assess when the trial is ready for a verdict
+
+
+DECISION CRITERIA:
+1. Evidence Sufficiency
+   - Is there enough evidence to support current claims?
+   - Are there gaps in the evidence that need filling?
+   - Is the evidence credible and relevant?
+
+2. Argument Balance
+   - Have both sides had fair opportunity to present their case?
+   - Are there unanswered counter-arguments?
+   - Is there a need for clarification or elaboration?
+
+3. Trial Progress
+   - Has the case been thoroughly examined?
+   - Are there remaining crucial points to address?
+   - Is there enough information for a fair verdict?
+
+You will go through the following chain of thought steps :
+1. ARGUMENT ANALYSIS & FACT CHECK ASSESSMENT
+2. EVIDENCE & CONSISTENCY EVALUATION
+3. TRIAL STATE REVIEW
+4. RESPONSE & DIRECTION FORMULATION
+
+do only current step at a time.
+
+AVAILABLE NEXT STEPS at last step:
+- "lawyer": Direct the defense lawyer to present arguments or respond
+- "prosecutor": Allow the prosecutor to present charges or counter-arguments
+- "END": Conclude the trial when sufficient evidence and arguments have been presented
+Remember: Your primary goal is to ensure justice through a thorough, fair, and efficient trial process."""
+        
+
+        
+
     def get_thought_steps(self) -> List[str]:
         """Get judge-specific chain of thought steps"""
         return [
-            "1. Review current trial state and latest arguments",
-            "2. Assess factual accuracy and evidence support",
-            "3. Evaluate argument completeness",
-            "4. Consider need for counter-arguments",
-            "5. Determine next steps",
-            "6. Formulate response and direction"
+            "1. ARGUMENT ANALYSIS & FACT CHECK ASSESSMENT:\n" +
+            "   - Evaluate if the latest argument is logically sound\n" +
+            "   - Identify any claims that require factual verification\n" +
+            "   - Check for any inconsistencies or gaps in reasoning",
+            "   - Determine if additional information (laws/web search) is needed for you (should call retriever)\n" +
+
+            "2. EVIDENCE & CONSISTENCY EVALUATION:\n" +
+            "   - Cross-reference claims with available information, if retrieved\n" +
+            "   - Assess internal consistency of the argument\n" +
+            "   - Evaluate strength of supporting evidence\n" +
+            "   - Identify any logical fallacies or weak reasoning",
+
+            "3. TRIAL STATE REVIEW:\n" +
+            "   - Assess overall progress of the trial\n" +
+            "   - Review strength of prosecution and defense cases\n" +
+            "   - Evaluate if key points have been adequately addressed\n" +
+            "   - Determine if case is ready for verdict or needs more arguments",
+
+            "4. RESPONSE & DIRECTION FORMULATION:\n" +
+            "   - Provide specific feedback on current arguments\n" +
+            "   - Determine next speaker (lawyer/prosecutor)\n" +
+            "   - Ensure fair alternation between parties unless compelling reason exists\n" +
+            "   - Give clear instructions for next phase of trial"
         ]
-    
-    async def process(self, state: AgentState) -> AgentResponse:
+    async def process(self, state: AgentState) -> AgentState:
         """Process current state with judge-specific logic"""
-        # Add judge context to state
-        messages = state["messages"] + [
-            SystemMessage(content="""
-                Consider the trial state carefully. You must decide:
-                1. If the latest argument needs fact-checking
-                2. If more evidence is needed (call retriever)
-                3. Which agent should speak next (lawyer/prosecutor)
-                4. If the trial is ready for a verdict
-                
-                Maintain trial fairness by alternating speakers unless there's a strong reason not to.
-            """)
-        ]
+
+       
+        # if state["thought_step"] >= 0:
+        messages = [
+            {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
+        ] + state["messages"]
+        # else:
+        #     messages = [
+        #         {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}
+        #     ] + state["messages"]
+
+        # print(f"prompt: {messages}")
+        if state["thought_step"] != 3:
+            result = self.llm.invoke(messages)
+        else:
+            result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        # Update state with judge context
-        state["messages"] = messages
-        
-        # Process through chain of thought
-        response = await super().process(state)
-        
-        # If chain of thought is complete, parse decision
-        if response["cot_finished"]:
-            decision = self._parse_judge_decision(response["messages"][-1].content)
-            response["next"] = decision["next_agent"]
-            
-            # Add fact check if performed
-            if decision["fact_check"]:
-                response["messages"].append(
-                    HumanMessage(
-                        content=f"Fact Check Results: {decision['fact_check']}",
-                        name="judge"
-                    )
-                )
-        
+        if state["thought_step"] == 0 or state["thought_step"] == 2:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="judge")],
+                "next": "self",
+                "thought_step": state["thought_step"]+1,
+                "caller": "judge"
+            }
+        elif state["thought_step"] == 1:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="judge") ],
+                "next": "retriever",
+                "thought_step": 2
+            }
+        elif state["thought_step"] == 3:
+            response = {
+                "messages": [HumanMessage(content=result.response, name="judge")],
+                "next": result.next_agent,
+                "thought_step": 0
+            }
+        else:
+            raise ValueError("Invalid thought step")
+
         return response
     
-    def _determine_next_agent(self, result: Dict[str, Any]) -> str:
-        """Determine next agent based on judge's decision"""
-        # Extract decision from last message
-        decision = self._parse_judge_decision(result["messages"][-1].content)
-        return decision["next_agent"]
-    
-    def _parse_judge_decision(self, content: str) -> JudgeDecision:
-        """Parse judge's decision from response content"""
-        # Default decision structure
-        decision: JudgeDecision = {
-            "next_agent": "lawyer",  # Default to lawyer if unclear
-            "reasoning": "",
-            "fact_check": None
-        }
+    # def _parse_judge_decision(self, content: str) -> JudgeDecision:
+    #     """Parse judge's decision from response content"""
+    #     # Default decision structure
+    #     decision: JudgeDecision = {
+    #         "next_agent": "lawyer",  # Default to lawyer if unclear
+    #         "reasoning": "",
+    #         "fact_check": None
+    #     }
         
-        content_lower = content.lower()
+    #     content_lower = content.lower()
         
-        # Check for fact-check indicators
-        if any(term in content_lower for term in ["fact check", "verify", "accuracy"]):
-            decision["fact_check"] = {
-                "validity": self._assess_validity(content),
-                "feedback": content
-            }
+    #     # Check for fact-check indicators
+    #     if any(term in content_lower for term in ["fact check", "verify", "accuracy"]):
+    #         decision["fact_check"] = {
+    #             "validity": self._assess_validity(content),
+    #             "feedback": content
+    #         }
         
-        # Check for verdict readiness
-        if any(term in content_lower for term in ["conclude", "verdict", "decision", "ruling"]):
-            decision["next_agent"] = "END"
-            decision["reasoning"] = "Trial ready for verdict"
-            return decision
+    #     # Check for verdict readiness
+    #     if any(term in content_lower for term in ["conclude", "verdict", "decision", "ruling"]):
+    #         decision["next_agent"] = "END"
+    #         decision["reasoning"] = "Trial ready for verdict"
+    #         return decision
         
-        # Check for retriever need
-        if any(term in content_lower for term in ["need information", "more evidence", "research"]):
-            decision["next_agent"] = "retriever"
-            decision["reasoning"] = "Additional information required"
-            return decision
+    #     # Check for retriever need
+    #     if any(term in content_lower for term in ["need information", "more evidence", "research"]):
+    #         decision["next_agent"] = "retriever"
+    #         decision["reasoning"] = "Additional information required"
+    #         return decision
         
-        # Determine next speaker
-        if "prosecutor" in content_lower:
-            decision["next_agent"] = "prosecutor"
-        elif "lawyer" in content_lower:
-            decision["next_agent"] = "lawyer"
+    #     # Determine next speaker
+    #     if "prosecutor" in content_lower:
+    #         decision["next_agent"] = "prosecutor"
+    #     elif "lawyer" in content_lower:
+    #         decision["next_agent"] = "lawyer"
             
-        decision["reasoning"] = content
-        return decision
+    #     decision["reasoning"] = content
+    #     return decision
     
-    def _assess_validity(self, content: str) -> float:
-        """Assess validity score from content"""
-        if "invalid" in content.lower():
-            return 0.0
-        elif "partially valid" in content.lower():
-            return 0.5
-        elif "valid" in content.lower():
-            return 1.0
-        return 0.5  # Default to partial validity if unclear
+    # def _assess_validity(self, content: str) -> float:
+    #     """Assess validity score from content"""
+    #     if "invalid" in content.lower():
+    #         return 0.0
+    #     elif "partially valid" in content.lower():
+    #         return 0.5
+    #     elif "valid" in content.lower():
+    #         return 1.0
+    #     return 0.5  # Default to partial validity if unclear
