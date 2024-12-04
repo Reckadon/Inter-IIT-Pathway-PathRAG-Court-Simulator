@@ -39,7 +39,8 @@ class TrialWorkflow:
         
         # Start with judge
         workflow.add_edge(START, "kanoon_fetcher")
-        workflow.add_edge("kanoon_fetcher", "judge")
+        workflow.add_edge("kanoon_fetcher", "prosecutor")
+        # workflow.add_edge(START, "prosecutor")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -146,7 +147,7 @@ class TrialWorkflow:
             ],
             next="kanoon_fetcher",
             thought_step=None,
-            cot_finished=True
+            # cot_finished=True
         )
         
         # Run the workflow

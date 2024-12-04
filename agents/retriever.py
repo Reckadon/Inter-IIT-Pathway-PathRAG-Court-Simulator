@@ -1,12 +1,10 @@
 from typing import Any, List, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
-from .base import BaseAgent, AgentState, AgentResponse
 from tools.retrievers import create_law_retriever
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from langchain.tools.retriever import create_retriever_tool
 from core.pathway_store import PathwayVectorStore
 from .base import AgentState
 from langchain_groq import ChatGroq
