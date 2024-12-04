@@ -1,165 +1,139 @@
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, Literal, TypedDict
 from langchain_core.messages import HumanMessage, SystemMessage
-from .base import BaseAgent, AgentState, AgentResponse
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.tools import BaseTool
+from .base import AgentState
 
-class ArgumentResponse(TypedDict):
-    """Structured argument response"""
-    argument: str
-    evidence_used: List[str]
-    needs_information: bool
-    information_request: Optional[str]
-    confidence: float
+class LawyerResponse(TypedDict):
+    """Structured lawyer response"""
+    response: str
+    next_step: Literal["self", "judge", "retriever"]
 
-class LawyerAgent(BaseAgent):
+class LawyerAgent:
     """Agent representing the defense counsel"""
     
-    def __init__(self, **kwargs):
-        system_prompt = """You are a skilled defense attorney. Your role is to:
-        1. Analyze case details and evidence thoroughly
-        2. Build strong arguments supporting your client
-        3. Use relevant laws and precedents effectively
-        4. Counter prosecution's arguments strategically
-        5. Request additional information when needed
+    def __init__(
+        self,
+        llm: Optional[BaseChatModel] = None,
+        tools: Optional[List[BaseTool]] = None,
+        **kwargs
+    ):
+        self.llm = llm or ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash-8b",
+            temperature=0,
+            convert_system_message_to_human=True
+        )
+        self.tools = tools or []
         
-        For each argument:
-        - Ground claims in available evidence
-        - Cite specific laws and precedents
-        - Address opposing arguments directly
-        - Identify information gaps
-        - Maintain professional conduct
-        """
-        super().__init__(system_prompt=system_prompt, **kwargs)
-    
+        self.system_prompt = """You are a skilled defense attorney in a specialized AI-driven legal system. Your role is to build and present compelling arguments for your client.
+
+ROLE AND RESPONSIBILITIES:
+1. Case Analysis
+   - Thoroughly analyze case details and evidence
+   - Identify key legal principles and precedents
+   - Spot potential weaknesses in prosecution's case
+   - Develop strategic defense angles
+
+2. Evidence Handling
+   - Evaluate strength of available evidence
+   - Request additional information when needed
+   - Challenge questionable evidence
+   - Present evidence effectively
+
+3. Argument Construction
+   - Build logically sound arguments
+   - Support claims with specific evidence
+   - Address opposing arguments proactively
+   - Maintain professional conduct
+
+AVAILABLE NEXT STEPS:
+- "self": Continue your chain of thought
+- "judge": Present completed argument to judge
+- "retriever": Request additional evidence or legal references
+
+ARGUMENT CRITERIA:
+1. Evidence Support
+   - Are claims supported by concrete evidence?
+   - Is additional information needed?
+   - Are sources credible and relevant?
+
+2. Legal Foundation
+   - Are arguments grounded in law?
+   - Are relevant precedents cited?
+   - Are legal principles properly applied?
+
+3. Strategic Value
+   - Does argument advance client's interests?
+   - Are weak points addressed?
+   - Is timing appropriate?
+
+You will go through the following chain of thought steps:
+1. CASE & EVIDENCE ANALYSIS
+2. LEGAL STRATEGY DEVELOPMENT
+3. ARGUMENT CONSTRUCTION
+4. VALIDATION & REFINEMENT
+
+Do only the current step at a time.
+
+Remember: Your goal is to present the strongest possible defense while maintaining ethical and professional standards."""
+
     def get_thought_steps(self) -> List[str]:
         """Get lawyer-specific chain of thought steps"""
         return [
-            "1. Review case context and recent developments",
-            "2. Analyze available evidence and precedents",
-            "3. Identify defense strategy opportunities",
-            "4. Evaluate information completeness",
-            "5. Structure argument components",
-            "6. Validate argument strength"
+            "1. CASE & EVIDENCE ANALYSIS:\n" +
+            "   - Review current case status and available evidence\n" +
+            "   - Identify key facts supporting defense\n" +
+            "   - Spot gaps requiring additional information\n" +
+            "   - Assess prosecution's recent arguments",
+
+            "2. LEGAL STRATEGY DEVELOPMENT:\n" +
+            "   - Determine optimal legal approach\n" +
+            "   - Identify relevant laws and precedents\n" +
+            "   - Plan counter-arguments to prosecution\n" +
+            "   - Consider timing and emphasis",
+
+            "3. ARGUMENT CONSTRUCTION:\n" +
+            "   - Build logical argument structure\n" +
+            "   - Connect evidence to legal principles\n" +
+            "   - Anticipate counter-arguments\n" +
+            "   - Craft persuasive narrative",
+
+            "4. VALIDATION & REFINEMENT:\n" +
+            "   - Review argument for logical consistency\n" +
+            "   - Verify evidence citations\n" +
+            "   - Check for potential weaknesses\n" +
+            "   - Polish final presentation"
         ]
-    
-    async def process(self, state: AgentState) -> AgentResponse:
+
+    async def process(self, state: AgentState) -> AgentState:
         """Process current state with lawyer-specific logic"""
-        # Add defense context to state
-        messages = state["messages"] + [
-            SystemMessage(content="""
-                As defense counsel, consider:
-                1. Current evidence supporting your client
-                2. Weaknesses in prosecution's arguments
-                3. Relevant legal precedents and statutes
-                4. Information gaps needing research
-                5. Strategic timing of arguments
-                
-                Maintain focus on your client's interests while adhering to legal ethics.
-            """)
-        ]
         
-        # Update state with defense context
-        state["messages"] = messages
+        # if state["thought_step"] >= 0:
+        messages = [
+            {"role": "human", "content": self.system_prompt, 
+                 "current_task": self.get_thought_steps()[state["thought_step"]]},
+        ] + state["messages"]
+        # else:
+        #     messages = [
+        #         {"role": "lawyer", "content": self.system_prompt, 
+        #          "current_task": "Initial case review and strategy planning"}
+        #     ] + state["messages"]
+
+        result = self.llm.with_structured_output(LawyerResponse).invoke(messages)
         
-        # Process through chain of thought
-        response = await super().process(state)
-        
-        # If chain of thought is complete, structure the argument
-        if response["cot_finished"]:
-            argument = self._structure_argument(response["messages"][-1].content)
+        if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
+            response = {
+                "messages": [HumanMessage(content=result["response"], name="lawyer")],
+                "next": result["next_step"],
+                "thought_step": state["thought_step"]+1,
+                "caller": "lawyer"
+            }
+        else:
+            response = {
+                "messages": [HumanMessage(content=result["response"], name="lawyer")],
+                "next": result["next_step"],
+                "thought_step": 0
+            }
             
-            # Check if we need more information
-            if argument["needs_information"]:
-                response["next"] = "retriever"
-                response["messages"].append(
-                    HumanMessage(
-                        content=f"Information Request: {argument['information_request']}",
-                        name="lawyer"
-                    )
-                )
-            else:
-                response["next"] = "judge"
-                response["messages"].append(
-                    HumanMessage(
-                        content=self._format_argument(argument),
-                        name="lawyer"
-                    )
-                )
-        
         return response
-    
-    def _determine_next_agent(self, result: Dict[str, Any]) -> str:
-        """Determine next agent based on argument needs"""
-        argument = self._structure_argument(result["messages"][-1].content)
-        return "retriever" if argument["needs_information"] else "judge"
-    
-    def _structure_argument(self, content: str) -> ArgumentResponse:
-        """Parse and structure the argument from response content"""
-        # Default argument structure
-        argument: ArgumentResponse = {
-            "argument": content,
-            "evidence_used": [],
-            "needs_information": False,
-            "information_request": None,
-            "confidence": 0.5
-        }
-        
-        content_lower = content.lower()
-        
-        # Extract evidence references
-        evidence_markers = ["evidence shows", "according to", "as demonstrated by", "records indicate"]
-        for marker in evidence_markers:
-            if marker in content_lower:
-                # Extract evidence reference following the marker
-                start_idx = content_lower.index(marker)
-                end_idx = content.find(".", start_idx)
-                if end_idx != -1:
-                    evidence = content[start_idx:end_idx].strip()
-                    argument["evidence_used"].append(evidence)
-        
-        # Check for information needs
-        info_markers = ["need more information", "requires research", "additional evidence needed"]
-        if any(marker in content_lower for marker in info_markers):
-            argument["needs_information"] = True
-            # Extract information request
-            for marker in info_markers:
-                if marker in content_lower:
-                    start_idx = content_lower.index(marker)
-                    end_idx = content.find(".", start_idx)
-                    if end_idx != -1:
-                        argument["information_request"] = content[start_idx:end_idx].strip()
-                        break
-        
-        # Assess confidence
-        confidence_markers = {
-            "strongly believe": 0.9,
-            "confident": 0.8,
-            "suggest": 0.6,
-            "possibly": 0.4,
-            "uncertain": 0.3
-        }
-        for marker, conf in confidence_markers.items():
-            if marker in content_lower:
-                argument["confidence"] = conf
-                break
-        
-        return argument
-    
-    def _format_argument(self, argument: ArgumentResponse) -> str:
-        """Format structured argument for presentation"""
-        formatted = []
-        
-        # Main argument
-        formatted.append(argument["argument"])
-        
-        # Evidence citations
-        if argument["evidence_used"]:
-            formatted.append("\nEvidence cited:")
-            for evidence in argument["evidence_used"]:
-                formatted.append(f"- {evidence}")
-        
-        # Confidence indicator
-        confidence_level = "High" if argument["confidence"] > 0.7 else \
-                         "Moderate" if argument["confidence"] > 0.4 else "Low"
-        formatted.append(f"\nConfidence Level: {confidence_level}")
-        
-        return "\n".join(formatted)

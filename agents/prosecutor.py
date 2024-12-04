@@ -1,181 +1,234 @@
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, Literal, TypedDict
 from langchain_core.messages import HumanMessage, SystemMessage
-from .base import BaseAgent, AgentState, AgentResponse
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.tools import BaseTool
+from .base import AgentState
 
-class ProsecutionArgument(TypedDict):
-    """Structured prosecution argument"""
-    argument: str
-    evidence_cited: List[str]
-    legal_basis: List[str]
-    needs_information: bool
-    information_request: Optional[str]
-    strength_assessment: float
+class ProsecutorResponse(TypedDict):
+    """Structured prosecutor response"""
+    response: str
+    next_step: Literal["self", "judge", "retriever"]
 
-class ProsecutorAgent(BaseAgent):
+class ProsecutorAgent:
     """Agent representing the prosecution"""
     
-    def __init__(self, **kwargs):
-        system_prompt = """You are a prosecutor representing the state. Your role is to:
-        1. Present evidence against the defendant systematically
-        2. Build compelling arguments based on facts and law
-        3. Challenge defense claims with evidence
-        4. Ensure all legal requirements are met
-        5. Maintain burden of proof standards
+    def __init__(
+        self,
+        llm: Optional[BaseChatModel] = None,
+        tools: Optional[List[BaseTool]] = None,
+        **kwargs
+    ):
+        self.llm = llm or ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash-8b",
+            temperature=0,
+            convert_system_message_to_human=True
+        )
+        self.tools = tools or []
         
-        For each argument:
-        - Link evidence to specific charges
-        - Cite relevant statutes and precedents
-        - Address defense counter-arguments
-        - Identify evidence gaps
-        - Maintain ethical prosecution standards
-        """
-        super().__init__(system_prompt=system_prompt, **kwargs)
-    
+        self.system_prompt = """You are a skilled prosecutor in a specialized AI-driven legal system. Your role is to present compelling arguments against the defendant while ensuring justice.
+
+ROLE AND RESPONSIBILITIES:
+1. Case Building
+   - Analyze evidence thoroughly
+   - Establish clear links to legal violations
+   - Meet burden of proof requirements
+   - Build systematic case progression
+
+2. Evidence Management
+   - Present evidence effectively
+   - Validate evidence reliability
+   - Request additional investigation when needed
+   - Challenge defense evidence appropriately
+
+3. Legal Application
+   - Apply relevant laws accurately
+   - Cite appropriate precedents
+   - Meet procedural requirements
+   - Maintain prosecution standards
+
+AVAILABLE NEXT STEPS:
+- "self": Continue your chain of thought
+- "judge": Present completed argument to judge
+- "retriever": Request additional evidence or legal references
+
+PROSECUTION CRITERIA:
+1. Evidence Strength
+   - Is evidence sufficient for charges?
+   - Are all elements proven?
+   - Are sources reliable?
+   - Is additional evidence needed?
+
+2. Legal Framework
+   - Are all legal elements addressed?
+   - Are precedents applicable?
+   - Is burden of proof met?
+
+3. Strategic Considerations
+   - Are defense arguments addressed?
+   - Is timing appropriate?
+   - Are weak points covered?
+
+You will go through the following chain of thought steps:
+1. EVIDENCE & CHARGE ANALYSIS
+2. LEGAL FRAMEWORK DEVELOPMENT
+3. ARGUMENT CONSTRUCTION
+4. VALIDATION & STRENGTHENING
+
+Do only the current step at a time.
+
+Remember: Your goal is to ensure justice through effective prosecution while maintaining ethical standards."""
+
     def get_thought_steps(self) -> List[str]:
         """Get prosecutor-specific chain of thought steps"""
         return [
-            "1. Review case evidence and defense claims",
-            "2. Identify key legal elements to prove",
-            "3. Analyze evidence strength for each element",
-            "4. Evaluate counter-argument needs",
-            "5. Structure prosecution argument",
-            "6. Validate legal sufficiency"
+            "1. EVIDENCE & CHARGE ANALYSIS:\n" +
+            "   - Review available evidence and case status\n" +
+            "   - Match evidence to charge elements\n" +
+            "   - Identify proof gaps\n" +
+            "   - Assess defense's recent arguments",
+
+            "2. LEGAL FRAMEWORK DEVELOPMENT:\n" +
+            "   - Identify applicable laws and precedents\n" +
+            "   - Structure legal requirements\n" +
+            "   - Plan evidence presentation\n" +
+            "   - Consider procedural requirements",
+
+            "3. ARGUMENT CONSTRUCTION:\n" +
+            "   - Build systematic prosecution case\n" +
+            "   - Link evidence to legal elements\n" +
+            "   - Address defense arguments\n" +
+            "   - Strengthen weak points",
+
+            "4. VALIDATION & STRENGTHENING:\n" +
+            "   - Review argument completeness\n" +
+            "   - Verify evidence citations\n" +
+            "   - Assess burden of proof\n" +
+            "   - Polish presentation"
         ]
-    
-    async def process(self, state: AgentState) -> AgentResponse:
+
+    async def process(self, state: AgentState) -> AgentState:
         """Process current state with prosecutor-specific logic"""
-        # Add prosecution context to state
-        messages = state["messages"] + [
-            SystemMessage(content="""
-                As prosecutor, focus on:
-                1. Elements of the charged offenses
-                2. Evidence supporting each element
-                3. Addressing defense challenges
-                4. Meeting burden of proof
-                5. Identifying evidence gaps
-                
-                Maintain ethical prosecution while pursuing justice.
-            """)
-        ]
         
-        # Update state with prosecution context
-        state["messages"] = messages
+        # if state["thought_step"] >= 0:
+        messages = [
+            {"role": "human", "content": self.system_prompt, 
+                 "current_task": self.get_thought_steps()[state["thought_step"]]},
+        ] + state["messages"]
+        # else:
+        #     messages = [
+        #         {"role": "prosecutor", "content": self.system_prompt, 
+        #          "current_task": "Initial case assessment and charge review"}
+        #     ] + state["messages"]
+
+        result = self.llm.with_structured_output(ProsecutorResponse).invoke(messages)
         
-        # Process through chain of thought
-        response = await super().process(state)
-        
-        # If chain of thought is complete, structure the argument
-        if response["cot_finished"]:
-            prosecution_arg = self._structure_prosecution(response["messages"][-1].content)
+        if 0 <= state["thought_step"] < len(self.get_thought_steps())-1:
+            response = {
+                "messages": [HumanMessage(content=result["response"], name="prosecutor")],
+                "next": result["next_step"],
+                "thought_step": state["thought_step"]+1,
+                "caller": "prosecutor"
+            }
+        else:
+            response = {
+                "messages": [HumanMessage(content=result["response"], name="prosecutor")],
+                "next": result["next_step"],
+                "thought_step": 0
+            }
             
-            # Check if we need more information
-            if prosecution_arg["needs_information"]:
-                response["next"] = "retriever"
-                response["messages"].append(
-                    HumanMessage(
-                        content=f"Information Request: {prosecution_arg['information_request']}",
-                        name="prosecutor"
-                    )
-                )
-            else:
-                response["next"] = "judge"
-                response["messages"].append(
-                    HumanMessage(
-                        content=self._format_prosecution(prosecution_arg),
-                        name="prosecutor"
-                    )
-                )
-        
         return response
     
-    def _determine_next_agent(self, result: Dict[str, Any]) -> str:
-        """Determine next agent based on prosecution needs"""
-        prosecution_arg = self._structure_prosecution(result["messages"][-1].content)
-        return "retriever" if prosecution_arg["needs_information"] else "judge"
+
+
+    # def _determine_next_agent(self, result: Dict[str, Any]) -> str:
+    #     """Determine next agent based on prosecution needs"""
+    #     prosecution_arg = self._structure_prosecution(result["messages"][-1].content)
+    #     return "retriever" if prosecution_arg["needs_information"] else "judge"
     
-    def _structure_prosecution(self, content: str) -> ProsecutionArgument:
-        """Parse and structure the prosecution argument"""
-        # Default prosecution structure
-        prosecution: ProsecutionArgument = {
-            "argument": content,
-            "evidence_cited": [],
-            "legal_basis": [],
-            "needs_information": False,
-            "information_request": None,
-            "strength_assessment": 0.5
-        }
+    # def _structure_prosecution(self, content: str) -> ProsecutionArgument:
+    #     """Parse and structure the prosecution argument"""
+    #     # Default prosecution structure
+    #     prosecution: ProsecutionArgument = {
+    #         "argument": content,
+    #         "evidence_cited": [],
+    #         "legal_basis": [],
+    #         "needs_information": False,
+    #         "information_request": None,
+    #         "strength_assessment": 0.5
+    #     }
         
-        content_lower = content.lower()
+    #     content_lower = content.lower()
         
-        # Extract evidence citations
-        evidence_markers = ["evidence shows", "as proven by", "exhibits demonstrate", "witness testimony"]
-        for marker in evidence_markers:
-            if marker in content_lower:
-                start_idx = content_lower.index(marker)
-                end_idx = content.find(".", start_idx)
-                if end_idx != -1:
-                    evidence = content[start_idx:end_idx].strip()
-                    prosecution["evidence_cited"].append(evidence)
+    #     # Extract evidence citations
+    #     evidence_markers = ["evidence shows", "as proven by", "exhibits demonstrate", "witness testimony"]
+    #     for marker in evidence_markers:
+    #         if marker in content_lower:
+    #             start_idx = content_lower.index(marker)
+    #             end_idx = content.find(".", start_idx)
+    #             if end_idx != -1:
+    #                 evidence = content[start_idx:end_idx].strip()
+    #                 prosecution["evidence_cited"].append(evidence)
         
-        # Extract legal basis
-        legal_markers = ["pursuant to", "under section", "statute requires", "law states"]
-        for marker in legal_markers:
-            if marker in content_lower:
-                start_idx = content_lower.index(marker)
-                end_idx = content.find(".", start_idx)
-                if end_idx != -1:
-                    legal_ref = content[start_idx:end_idx].strip()
-                    prosecution["legal_basis"].append(legal_ref)
+    #     # Extract legal basis
+    #     legal_markers = ["pursuant to", "under section", "statute requires", "law states"]
+    #     for marker in legal_markers:
+    #         if marker in content_lower:
+    #             start_idx = content_lower.index(marker)
+    #             end_idx = content.find(".", start_idx)
+    #             if end_idx != -1:
+    #                 legal_ref = content[start_idx:end_idx].strip()
+    #                 prosecution["legal_basis"].append(legal_ref)
         
-        # Check for information needs
-        info_markers = ["require additional evidence", "need investigation", "further proof needed"]
-        if any(marker in content_lower for marker in info_markers):
-            prosecution["needs_information"] = True
-            for marker in info_markers:
-                if marker in content_lower:
-                    start_idx = content_lower.index(marker)
-                    end_idx = content.find(".", start_idx)
-                    if end_idx != -1:
-                        prosecution["information_request"] = content[start_idx:end_idx].strip()
-                        break
+    #     # Check for information needs
+    #     info_markers = ["require additional evidence", "need investigation", "further proof needed"]
+    #     if any(marker in content_lower for marker in info_markers):
+    #         prosecution["needs_information"] = True
+    #         for marker in info_markers:
+    #             if marker in content_lower:
+    #                 start_idx = content_lower.index(marker)
+    #                 end_idx = content.find(".", start_idx)
+    #                 if end_idx != -1:
+    #                     prosecution["information_request"] = content[start_idx:end_idx].strip()
+    #                     break
         
-        # Assess argument strength
-        strength_markers = {
-            "conclusively proves": 0.9,
-            "strongly demonstrates": 0.8,
-            "indicates": 0.6,
-            "suggests": 0.5,
-            "may show": 0.3
-        }
-        for marker, strength in strength_markers.items():
-            if marker in content_lower:
-                prosecution["strength_assessment"] = strength
-                break
+    #     # Assess argument strength
+    #     strength_markers = {
+    #         "conclusively proves": 0.9,
+    #         "strongly demonstrates": 0.8,
+    #         "indicates": 0.6,
+    #         "suggests": 0.5,
+    #         "may show": 0.3
+    #     }
+    #     for marker, strength in strength_markers.items():
+    #         if marker in content_lower:
+    #             prosecution["strength_assessment"] = strength
+    #             break
         
-        return prosecution
+    #     return prosecution
     
-    def _format_prosecution(self, prosecution: ProsecutionArgument) -> str:
-        """Format structured prosecution argument"""
-        formatted = []
+    # def _format_prosecution(self, prosecution: ProsecutionArgument) -> str:
+    #     """Format structured prosecution argument"""
+    #     formatted = []
         
-        # Main argument
-        formatted.append(prosecution["argument"])
+    #     # Main argument
+    #     formatted.append(prosecution["argument"])
         
-        # Legal basis
-        if prosecution["legal_basis"]:
-            formatted.append("\nLegal Basis:")
-            for basis in prosecution["legal_basis"]:
-                formatted.append(f"- {basis}")
+    #     # Legal basis
+    #     if prosecution["legal_basis"]:
+    #         formatted.append("\nLegal Basis:")
+    #         for basis in prosecution["legal_basis"]:
+    #             formatted.append(f"- {basis}")
         
-        # Evidence citations
-        if prosecution["evidence_cited"]:
-            formatted.append("\nEvidence:")
-            for evidence in prosecution["evidence_cited"]:
-                formatted.append(f"- {evidence}")
+    #     # Evidence citations
+    #     if prosecution["evidence_cited"]:
+    #         formatted.append("\nEvidence:")
+    #         for evidence in prosecution["evidence_cited"]:
+    #             formatted.append(f"- {evidence}")
         
-        # Strength assessment
-        strength_level = "Strong" if prosecution["strength_assessment"] > 0.7 else \
-                        "Moderate" if prosecution["strength_assessment"] > 0.4 else "Weak"
-        formatted.append(f"\nArgument Strength: {strength_level}")
+    #     # Strength assessment
+    #     strength_level = "Strong" if prosecution["strength_assessment"] > 0.7 else \
+    #                     "Moderate" if prosecution["strength_assessment"] > 0.4 else "Weak"
+    #     formatted.append(f"\nArgument Strength: {strength_level}")
         
-        return "\n".join(formatted)
+    #     return "\n".join(formatted)
