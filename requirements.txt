@@ -16,3 +16,4 @@ unstructured
 langchain_groq
 duckduckgo_search
 streamlit
+opencv-python

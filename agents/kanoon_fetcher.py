@@ -52,9 +52,9 @@ class KeywordExtractorAgent:
 Relevant Documents:
 {documents_content}
 
-Based on the above user case and documents, extract a list of relevant keywords, phrases, and legal terms that the user can use to search for supportive cases and information. The keywords should be specific to the user's case and cover all important aspects.
+Based on the above user case and documents, extract a list of TOP 5 relevant keywords, phrases, or legal terms that the user can use to search for supportive cases and information. The keywords should be specific to the user's case and cover all important aspects. Do Not provide anything else than the keywords. No reasoning is needed.
 
-Provide the list of keywords in bullet point format.
+Provide the list of just the 5 most relevant keywords in bullet point format.
 """
         })
 
@@ -98,7 +98,7 @@ class FetchingAgent(BaseAgent):
         if not kanoon_api_key:
             raise ValueError("KANOON_API_KEY not found in environment variables.")
 
-        data_directory = "data/kanoon_results"
+        data_directory = "public_documents"
         os.makedirs(data_directory, exist_ok=True)
         filestorage = FileStorage(data_directory)
 
@@ -152,7 +152,7 @@ class FetchingAgent(BaseAgent):
             print(f"- {keyword}")
 
         # Specify max_docs per keyword
-        MAX_DOCS_PER_KEYWORD = 10
+        MAX_DOCS_PER_KEYWORD = 2
 
         all_doc_ids = []
         for keyword in keywords[:5]:

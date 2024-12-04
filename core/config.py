@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     HUGGINGFACE_API_KEY: str
     SERPER_API_KEY: str
+    KANOON_API_KEY: str
     
     class Config:
         env_file = ".env"
