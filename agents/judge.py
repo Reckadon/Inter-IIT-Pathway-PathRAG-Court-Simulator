@@ -17,7 +17,7 @@ class JudgeDecision(BaseModel):
     """Judge's structured decision output"""
     response: str = Field(description="The judge's response and comments")
     next_agent: Literal["lawyer", "prosecutor", "END"] = Field(
-        description="Next agent to act in the trial or END if verdict is given in response"
+        description="Next agent to speak in the trial or END if verdict is given in response"
     )
 
 class JudgeAgent:
@@ -32,57 +32,25 @@ class JudgeAgent:
         self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
-        self.system_prompt = """You are an impartial judge presiding over a legal trial in a specialized AI-driven legal system. Your role is critical in ensuring fair proceedings and making informed decisions.
+        self.system_prompt = """
+"You are a presiding judge overseeing a courtroom simulation. Your primary role is to evaluate the arguments presented by the lawyer and prosecutor for logical consistency, factual accuracy, and adherence to legal principles."
+"Point out inconsistencies, hallucinations, or errors in the agents' arguments and provide constructive feedback to help refine them."
+"Call upon the Law Retriever and Web Searcher agents as necessary to verify or clarify legal and factual claims made during the arguments."
+"Monitor the proceedings and identify when no new points are being raised, all conflicts and rebuttals have been adequately addressed, and the case is ready for a verdict."
+"When the arguments have reached this stage, request final statements from both the lawyer and prosecutor before delivering your impartial verdict."
+"Summarize the case before delivering a verdict, outlining the key points of contention and the reasoning behind your decision."
+"Facilitate a fair and structured discussion, ensuring that both parties have equal opportunity to present their case."
+"Your decisions and comments should be impartial, grounded in logic, and aimed at maintaining the integrity of the courtroom process."
 
-ROLE AND RESPONSIBILITIES:
-1. Trial Management
-   - Maintain order and fairness in proceedings
-   - Ensure balanced participation between lawyer and prosecutor
-   - Monitor the logical flow and coherence of arguments
-   - Prevent repetitive or circular arguments
+you will go through the following chain of thought steps:
+1. Review arguments
+2. legal data retrieval
+3. web search
+4. check if trial is ready for verdict
+5. give response based on above steps
 
-2. Evidence Evaluation
-   - Assess the credibility and relevance of presented evidence
-   - Verify factual claims against available documentation
-   - Request additional evidence when necessary
-   - Identify gaps in evidence that need addressing
-
-3. Decision Making
-   - Make informed decisions about trial progression
-   - Determine when sufficient evidence has been presented
-   - Evaluate when counter-arguments are needed
-   - Assess when the trial is ready for a verdict
-
-
-DECISION CRITERIA:
-1. Evidence Sufficiency
-   - Is there enough evidence to support current claims?
-   - Are there gaps in the evidence that need filling?
-   - Is the evidence credible and relevant?
-
-2. Argument Balance
-   - Have both sides had fair opportunity to present their case?
-   - Are there unanswered counter-arguments?
-   - Is there a need for clarification or elaboration?
-
-3. Trial Progress
-   - Has the case been thoroughly examined?
-   - Are there remaining crucial points to address?
-   - Is there enough information for a fair verdict?
-
-You will go through the following chain of thought steps :
-1. ARGUMENT ANALYSIS & FACT CHECK ASSESSMENT
-2. EVIDENCE & CONSISTENCY EVALUATION
-3. TRIAL STATE REVIEW
-4. RESPONSE & DIRECTION FORMULATION
-
-do only current step at a time.
-
-AVAILABLE NEXT STEPS at last step:
-- "lawyer": Direct the defense lawyer to present arguments or respond
-- "prosecutor": Allow the prosecutor to present charges or counter-arguments
-- "END": Conclude the trial when sufficient evidence and arguments have been presented
-Remember: Your primary goal is to ensure justice through a thorough, fair, and efficient trial process."""
+Do only current task at a time. Avoid very long responses.
+"""
         
 
         
@@ -90,29 +58,13 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
     def get_thought_steps(self) -> List[str]:
         """Get judge-specific chain of thought steps"""
         return [
-            "1. ARGUMENT ANALYSIS & FACT CHECK ASSESSMENT:\n" +
-            "   - Evaluate if the latest argument is logically sound\n" +
-            "   - Identify any claims that require factual verification\n" +
-            "   - Check for any inconsistencies or gaps in reasoning",
-            "   - Determine if additional information (laws/web search) is needed for you (should call retriever)\n" +
-
-            "2. EVIDENCE & CONSISTENCY EVALUATION:\n" +
-            "   - Cross-reference claims with available information, if retrieved\n" +
-            "   - Assess internal consistency of the argument\n" +
-            "   - Evaluate strength of supporting evidence\n" +
-            "   - Identify any logical fallacies or weak reasoning",
-
-            "3. TRIAL STATE REVIEW:\n" +
-            "   - Assess overall progress of the trial\n" +
-            "   - Review strength of prosecution and defense cases\n" +
-            "   - Evaluate if key points have been adequately addressed\n" +
-            "   - Determine if case is ready for verdict or needs more arguments",
-
-            "4. RESPONSE & DIRECTION FORMULATION:\n" +
-            "   - Provide specific feedback on current arguments\n" +
-            "   - Determine next speaker (lawyer/prosecutor)\n" +
-            "   - Ensure fair alternation between parties unless compelling reason exists\n" +
-            "   - Give clear instructions for next phase of trial"
+            "1. Listen to the arguments presented by both the lawyer and prosecutor. Note their key points and claims. Identify potential hallucinations or logical errors or factual errors in latest argument.",
+            "2. Determine the specific legal information (e.g., laws, IPCs) required for cross verificaton of identified errors. Clearly ask the law retriever agent for the necessary details.",
+            "3. Evaluate if additional web-based information is needed. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
+            "4. Assess the current state of the case, analyze and determine if it is ready for a verdict.",
+            """5. Provide constructive feedback or comments, pointing out logical flaws, factual inconsistencies, or unsupported claims in the arguments if present based on retrieverd data. 
+            From previous step, if trail is ready for verdict, ask for final statements from both lawyer and prosecutor., if already asked for final statements, summarize the case and deliver verdict with keyphrase "Given Verdict".
+            Write the response as live dialogue (avoid bullet points), Maintain an impartial tone.""" 
         ]
     async def process(self, state: AgentState) -> AgentState:
         """Process current state with judge-specific logic"""
@@ -128,12 +80,12 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
         #     ] + state["messages"]
 
         # print(f"prompt: {messages}")
-        if state["thought_step"] != 3:
+        if state["thought_step"] != 4:
             result = self.llm.invoke(messages)
         else:
             result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        if state["thought_step"] == 0 or state["thought_step"] == 2:
+        if state["thought_step"] == 0 or state["thought_step"] == 3:
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge")],
                 "next": "self",
@@ -144,18 +96,33 @@ Remember: Your primary goal is to ensure justice through a thorough, fair, and e
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge") ],
                 "next": "retriever",
-                "thought_step": 2
+                "thought_step": 2,
+                "caller": "judge"
             }
-        elif state["thought_step"] == 3:
+        elif state["thought_step"] == 2:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="judge") ],
+                "next": self.is_web_search_needed(result.content),
+                "thought_step": 3,
+                "caller": "judge"
+            }
+        elif state["thought_step"] == 4:
             response = {
                 "messages": [HumanMessage(content=result.response, name="judge")],
                 "next": result.next_agent,
-                "thought_step": 0
+                "thought_step": 0,
+                "caller": "judge"
             }
         else:
             raise ValueError("Invalid thought step")
 
         return response
+    
+    def is_web_search_needed(self, content: str) -> Literal["self", "web_searcher"]:
+        if "none" in content.lower():
+            return "self"
+        else:
+            return "web_searcher"
     
     # def _parse_judge_decision(self, content: str) -> JudgeDecision:
     #     """Parse judge's decision from response content"""

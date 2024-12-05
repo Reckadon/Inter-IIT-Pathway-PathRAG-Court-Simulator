@@ -47,79 +47,29 @@ class RetrieverAgent:
         self.vector_store_retriever = create_law_retriever()
         self.llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
         
-        self.system_prompt = """You are a legal document retrieval specialist. Your role is to find relevant legal information from a database of laws, statutes, and precedents.
+        self.system_prompt = """
+"You are a legal research assistant specializing in retrieving relevant legal provisions, case laws, and statutes from a vector database of the Indian Penal Code (IPC) and related legal documents."
+"Formulate queries based on inputs from the judge, lawyer, or prosecutor, ensuring precision in the retrieval process."
+"Evaluate the retrieved text for relevance and clarity before sharing it with the requesting agent. If the retrieval is insufficient, refine the query and attempt again."
+"Your role is critical in supporting the legal arguments by providing accurate and contextually appropriate legal references."
+"Ensure that your outputs are succinct, relevant, and formatted for easy understanding by the requesting agent."
 
-ROLE AND RESPONSIBILITIES:
-1. Query Formation
-   - Analyze information needs carefully
-   - Break down complex requests into specific queries
-   - Identify key legal concepts and terms
-   - Formulate precise search queries
+you will go through the following chain of thought steps:
+1. Analyze the information request.
+2. Form a query.
+3. Assess the retrieved results.
+4. Provide accurate excerpts of information
 
-2. Result Analysis
-   - Evaluate retrieved documents for relevance
-   - Assess if information meets the request
-   - Identify gaps requiring additional queries
-   - Determine if more specific searches are needed
-
-3. Information Synthesis
-   - Combine relevant findings
-   - Present information clearly
-   - Highlight key legal points
-   - Indicate if more retrieval is needed
-
-RETRIEVAL CRITERIA:
-1. Query Effectiveness
-   - Are search terms specific enough?
-   - Do they capture legal concepts?
-   - Are variations needed?
-
-2. Result Adequacy
-   - Do results answer the request?
-   - Is information complete?
-   - Are more queries needed?
-
-3. Legal Relevance
-   - Are documents legally relevant?
-   - Do they address the specific issue?
-   - Are they authoritative sources?
-
-You will go through the following chain of thought steps:
-1. INFORMATION NEED ANALYSIS
-2. QUERY FORMULATION & RETRIEVAL
-3. RESULT ASSESSMENT
-4. CONTINUATION DECISION
-
-Do only the current step at a time.
-
-Remember: Your goal is to find the most relevant legal information. If results are insufficient, continue with refined queries."""
+Do only current task at a time. Avoid very long responses.
+"""
 
     def get_thought_steps(self) -> List[str]:
         """Get retriever-specific chain of thought steps"""
         return [
-            "1. INFORMATION NEED ANALYSIS:\n" +
-            "   - Understand the legal information needed\n" +
-            "   - Identify key legal concepts\n" +
-            "   - Break down complex requests\n" +
-            "   - Plan search approach",
-
-            "2. QUERY FORMULATION & RETRIEVAL:\n" +
-            "   - Create specific legal queries\n" +
-            "   - Use appropriate legal terminology\n" +
-            "   - Execute vector store search\n" +
-            "   - Collect initial results",
-
-            "3. RESULT ASSESSMENT:\n" +
-            "   - Evaluate document relevance\n" +
-            "   - Check legal applicability\n" +
-            "   - Identify information gaps\n" +
-            "   - Determine result sufficiency",
-
-            "4. FINAL RESULT SYNTHESIS:\n" +
-            "   - Combine relevant findings\n" +
-            "   - Present information clearly\n" +
-            "   - Highlight key legal points\n" +
-            "   - Indicate if exact information not found"
+            "1. Analyze the information request received from the lawyer or prosecutor and Note the key words and points.",
+            "2. Form a very good query to Retrieve the most relevant legal text or IPC sections needed. respond with only query.",
+            "3. Assess the retrieved results and determine If they are relevent and enough. if yes, set is_enough True. if not, refine the query. respond with only query and is_enough false",
+            "4. Provide the lawyer or prosecutor with accurate excerpts of relevant laws based on the request, ensuring clarity.If no relevant law is found, respond with 'No relevant law found in database.'"
         ]
 
     async def process(self, state: AgentState) -> AgentState:
@@ -158,7 +108,8 @@ Remember: Your goal is to find the most relevant legal information. If results a
         response = {
             "messages": [HumanMessage(content=result.content, name="retriever")],
             "next": state["caller"],
-            "thought_step": state["thought_step"]
+            "thought_step": state["thought_step"],
+            "caller": "retriever"
         }
         # else:
         #     response = {

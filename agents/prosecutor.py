@@ -33,82 +33,29 @@ class ProsecutorAgent:
         self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
         self.tools = tools or []
         
-        self.system_prompt = """You are a skilled prosecutor in a specialized AI-driven legal system. Your role is to present compelling arguments against the defendant while ensuring justice.
+        self.system_prompt = """
+"You are a professional prosecutor advocating for the opposing party in a courtroom simulation. Your role is to challenge the defense's arguments and present evidence and laws to support the prosecution's case."
+"Analyze and counter the defense lawyer's claims effectively, relying on factual accuracy, logical reasoning, and legal provisions."
+"Collaborate with the Law Retriever to extract relevant laws and case studies and use the Web Searcher to source additional factual or contextual evidence."
+"Your arguments should reflect high levels of objectivity, clarity, and persuasive reasoning, adhering to the principles of fairness and justice."
+"Respond to the judge's observations or corrections with due diligence and adapt your arguments to maintain a strong prosecutorial stance."
 
-ROLE AND RESPONSIBILITIES:
-1. Case Building
-   - Analyze evidence thoroughly
-   - Establish clear links to legal violations
-   - Meet burden of proof requirements
-   - Build systematic case progression
+you will go through the following chain of thought steps:
+1. Review current state and plan a strategy
+2. Identify the legal information needed to support the argument
+3. Assess if information from the web is required
+4. Argument construction
 
-2. Evidence Management
-   - Present evidence effectively
-   - Validate evidence reliability
-   - Request additional investigation when needed
-   - Challenge defense evidence appropriately
-
-3. Legal Application
-   - Apply relevant laws accurately
-   - Cite appropriate precedents
-   - Meet procedural requirements
-   - Maintain prosecution standards
-
-
-
-PROSECUTION CRITERIA:
-1. Evidence Strength
-   - Is evidence sufficient for charges?
-   - Are all elements proven?
-   - Are sources reliable?
-   - Is additional evidence needed?
-
-2. Legal Framework
-   - Are all legal elements addressed?
-   - Are precedents applicable?
-   - Is burden of proof met?
-
-3. Strategic Considerations
-   - Are defense arguments addressed?
-   - Is timing appropriate?
-   - Are weak points covered?
-
-You will go through the following chain of thought steps:
-1. EVIDENCE & CHARGE ANALYSIS
-2. LEGAL FRAMEWORK DEVELOPMENT
-3. ARGUMENT CONSTRUCTION
-4. VALIDATION & STRENGTHENING
-
-Do only the current step at a time.
-
-Remember: Your goal is to ensure justice through effective prosecution while maintaining ethical standards."""
+Do only current task at a time. Avoid very long responses.
+"""
 
     def get_thought_steps(self) -> List[str]:
         """Get prosecutor-specific chain of thought steps"""
         return [
-            "1. EVIDENCE & CHARGE ANALYSIS:\n" +
-            "   - Review available evidence and case status\n" +
-            "   - Match evidence to charge elements\n" +
-            "   - Identify proof gaps\n" +
-            "   - Assess defense's recent arguments",
-
-            "2. LEGAL FRAMEWORK DEVELOPMENT:\n" +
-            "   - Identify applicable laws and precedents\n" +
-            "   - Structure legal requirements\n" +
-            "   - Plan evidence presentation\n" +
-            "   - set 'next_agent' as 'retriever'",
-
-            "3. ARGUMENT CONSTRUCTION:\n" +
-            "   - Build systematic prosecution case\n" +
-            "   - Link evidence to legal elements\n" +
-            "   - Address defense arguments\n" +
-            "   - Strengthen weak points",
-
-            "4. VALIDATION & STRENGTHENING:\n" +
-            "   - Review argument completeness\n" +
-            "   - Verify evidence citations\n" +
-            "   - Assess burden of proof\n" +
-            "   - Polish presentation"
+            "1. Review the case files, analyze the user's arguments to identify weaknesses or inconsistencies in their claims and plan a strategy to build strong arguments against the defendant, ensuring they are logically sound and factually supported.",
+            "2. Determine the specific legal information(e.g., laws, IPCs) required to strengthen your arguments or refute the user's points. Clearly ask the law retriever agent for the necessary details.",
+            "3. Evaluate if additional web-based information is needed. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
+            "4. Construct a comprehensive argument or counterargument based on the retrieved data and your planed strategy. Write the response as live dialogue (avoid bullet points), maintaining logical coherence and factual accuracy."
         ]
 
     async def process(self, state: AgentState) -> AgentState:
@@ -120,7 +67,7 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
 
         result = self.llm.invoke(messages)
         
-        if state["thought_step"] == 0 or state["thought_step"] == 2:
+        if state["thought_step"] == 0:
             response = {
                 "messages": [HumanMessage(content=result.content, name="prosecutor")],
                 "next": "self",
@@ -131,20 +78,33 @@ Remember: Your goal is to ensure justice through effective prosecution while mai
             response = {
                 "messages": [HumanMessage(content=result.content, name="prosecutor")],
                 "next": "retriever",
-                "thought_step": 2
+                "thought_step": 2,
+                "caller": "prosecutor"
+            }
+        elif state["thought_step"] == 2:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="prosecutor")],
+                "next": self.is_web_search_needed(result.content),
+                "thought_step": 3,
+                "caller": "prosecutor"
             }
         elif state["thought_step"] == 3:
             response = {
                 "messages": [HumanMessage(content=result.content, name="prosecutor")],
                 "next": "judge",
-                "thought_step": 0
+                "thought_step": 0,
+                "caller": "prosecutor"
             }
         else:
             raise ValueError("Invalid thought step")
             
         return response
     
-
+    def is_web_search_needed(self, content: str) -> Literal["self", "web_searcher"]:
+        if "none" in content.lower():
+            return "self"
+        else:
+            return "web_searcher"
 
     # def _determine_next_agent(self, result: Dict[str, Any]) -> str:
     #     """Determine next agent based on prosecution needs"""
