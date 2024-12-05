@@ -1,7 +1,9 @@
 import os
 import asyncio
 from typing import Dict, Any, List, Optional, TypedDict
-from .base import BaseAgent, AgentState, AgentResponse
+from .base import AgentState
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 from groq import Groq
@@ -84,15 +86,21 @@ class Document:
     def __init__(self, content: str):
         self.content = content
 
-class FetchingAgent(BaseAgent):
+class FetchingAgent:
     """Agent responsible for fetching relevant docs from the kanoon api"""
     
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        # llm: Optional[BaseChatModel] = None,
+        # tools: Optional[List[BaseTool]] = None,
+        **kwargs
+    ):
         print("initialised kanoon fetcher...")
-        super().__init__(**kwargs)
+        # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        # self.tools = tools or []
 
     
-    async def process(self, state: AgentState) -> AgentResponse:
+    async def process(self, state: AgentState) -> AgentState:
         """Process current state with fetching-specific logic"""
         kanoon_api_key = os.getenv("KANOON_API_KEY")
         if not kanoon_api_key:

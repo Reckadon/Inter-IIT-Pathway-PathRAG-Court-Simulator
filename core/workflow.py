@@ -164,8 +164,8 @@ class TrialWorkflow:
                 HumanMessage(content=user_prompt)
             ],
             next="kanoon_fetcher",
-            thought_step=None,
-            cot_finished=True
+            thought_step=0,
+            # cot_finished=True
         )
         
         # Run the workflow

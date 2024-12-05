@@ -1,12 +1,10 @@
 from typing import Any, List, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
-from .base import BaseAgent, AgentState, AgentResponse
 from tools.retrievers import create_law_retriever
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
-from langchain.tools.retriever import create_retriever_tool
 from core.pathway_store import PathwayVectorStore
 from .base import AgentState
 from langchain_groq import ChatGroq
@@ -43,11 +41,11 @@ class RetrieverAgent:
     def __init__(
         self,
         # vector_store_retriever: Any,
-        llm: Optional[BaseChatModel] = None,
+        # llm: Optional[BaseChatModel] = None,
         **kwargs
     ):
         self.vector_store_retriever = create_law_retriever()
-        self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+        self.llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
         
         self.system_prompt = """You are a legal document retrieval specialist. Your role is to find relevant legal information from a database of laws, statutes, and precedents.
 
@@ -144,7 +142,7 @@ Remember: Your goal is to find the most relevant legal information. If results a
             retrieved_content = self.vector_store_retriever.invoke(query.content)
 
             #assess
-            messages.append({"role": "system", "content": "retrieved_content: " + retrieved_content.content + "\n" + "current_task: " + self.get_thought_steps()[2]})
+            messages.append({"role": "system", "content": "retrieved_content: " + str(retrieved_content) + "\n" + "current_task: " + self.get_thought_steps()[2]})
             assessment = self.llm.with_structured_output(RetrieverResponse).invoke(messages)
 
             #continue
