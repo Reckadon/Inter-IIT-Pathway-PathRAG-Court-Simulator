@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 class KeywordExtractorAgent:
     def __init__(self,
         documents: List[Any],
-        llm: Optional[ChatGoogleGenerativeAI] = None
+        llm
     ):
         self.documents = documents
         self.llm = llm or ChatGoogleGenerativeAI(
@@ -85,7 +85,8 @@ class Document:
 class FetchingAgent:
     """Agent responsible for fetching relevant docs from the kanoon api"""
     
-    def __init__(self, **kwargs):
+    def __init__(self, llm):
+        self.llm = llm
         print("initialised kanoon fetcher...")
         # super().__init__(**kwargs)
 
@@ -140,7 +141,7 @@ class FetchingAgent:
         ]
 
         # Extract Keywords
-        agent = KeywordExtractorAgent(documents=documents)
+        agent = KeywordExtractorAgent(documents=documents, llm=self.llm)
         keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases

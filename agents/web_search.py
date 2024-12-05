@@ -3,11 +3,12 @@ from .base import AgentState
 from langchain_core.messages import HumanMessage
 
 class WebSearcherAgent:
-    def __init__(self):
+    def __init__(self, llm):
         self.data_retriever_crew = DataRetrievalCrew
+        self.llm = llm
 
     def process(self, state: AgentState) -> AgentState:
-        result = self.data_retriever_crew(state["messages"][-1].content).run()
+        result = self.data_retriever_crew(state["messages"][-1].content, llm=self.llm).run()
         # print(result)
         # print(type(result))
         return {

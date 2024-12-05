@@ -1,7 +1,6 @@
 from typing import Any, List, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
-from tools.retrievers import create_law_retriever
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field

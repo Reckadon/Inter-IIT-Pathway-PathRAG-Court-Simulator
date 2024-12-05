@@ -1,5 +1,4 @@
-import sys
-sys.path.append('/home/nikhilesh/agents')
+
 import asyncio
 from typing import Dict, Any
 from rich.console import Console
