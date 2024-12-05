@@ -36,10 +36,11 @@ class TrialWorkflow:
         workflow.add_node("lawyer", self._lawyer_node)
         workflow.add_node("prosecutor", self._prosecutor_node)
         workflow.add_node("retriever", self._retriever_node)
+        workflow.add_node("web_search", self._web_search_node)
         
         # Start with judge
         workflow.add_edge(START, "kanoon_fetcher")
-        workflow.add_edge("kanoon_fetcher", "judge")
+        workflow.add_edge("kanoon_fetcher", "prosecutor")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -50,6 +51,7 @@ class TrialWorkflow:
                 "prosecutor": "prosecutor",
                 "retriever": "retriever",
                 "self": "judge",
+                "web_search": "web_search",
                 "END": END
             }
         )
@@ -61,6 +63,7 @@ class TrialWorkflow:
             {
                 "judge": "judge",
                 "retriever": "retriever",
+                "web_search": "web_search",
                 "self": "lawyer"  # For Chain of Thought
             }
         )
@@ -72,6 +75,7 @@ class TrialWorkflow:
             {
                 "judge": "judge",
                 "retriever": "retriever",
+                "web_search": "web_search",
                 "self": "prosecutor"  # For Chain of Thought
             }
         )
@@ -84,6 +88,16 @@ class TrialWorkflow:
                 "lawyer": "lawyer",
                 "prosecutor": "prosecutor",
                 "judge": "judge"
+            }
+        )
+
+        # Web Search returns to calling agent
+        workflow.add_conditional_edges(
+            "web_search",
+            self._route_from_retriever,
+            {
+                "judge": "judge",
+                "self": "web_search"
             }
         )
         
@@ -113,6 +127,11 @@ class TrialWorkflow:
         print(f"Retriever node processing with state: {state}")
         return await self.retriever.process(state)
     
+    async def _web_search_node(self, state: AgentState) -> AgentState:
+        """Web Search node processing"""
+        print(f"Web Search node processing with state: {state}")
+        return await self.web_search.process(state)
+    
     def _route_from_judge(self, state: AgentState) -> str:
         """Route based on judge's decision"""
         # Check if verdict is ready
@@ -135,14 +154,14 @@ class TrialWorkflow:
         #     if hasattr(msg, "name"):
         #         if msg.name in ["lawyer", "prosecutor"]:
         #             return msg.name
-        return "judge"  # Default to judge if can't determine
+        return state["next"]  # Default to judge if can't determine
     
-    async def run(self, case_details: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, user_prompt: str) -> Dict[str, Any]:
         """Run the trial workflow"""
         # Initialize state
         initial_state = AgentState(
             messages=[
-                HumanMessage(content=f"New case: {case_details['title']}\n\n{case_details['description']}")
+                HumanMessage(content=user_prompt)
             ],
             next="kanoon_fetcher",
             thought_step=None,

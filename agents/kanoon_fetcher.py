@@ -141,9 +141,11 @@ class FetchingAgent(BaseAgent):
             ),
         ]
 
+        # docs = state["messages"][-1].content
+        
         # Extract Keywords
         agent = KeywordExtractorAgent(documents=documents)
-        keywords_result = agent.extract_keywords(user_case=user_case)
+        keywords_result = agent.extract_keywords(user_case=state["messages"][-1].content)
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases
         print("Extracted Keywords:")

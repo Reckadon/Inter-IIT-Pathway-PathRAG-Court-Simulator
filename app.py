@@ -18,5 +18,5 @@ if __name__ == "__main__":
     )
 
     # workflow.visualize()
-    res = asyncio.run(workflow.run(case_details={'title': "New case regareding murder of Rajat Moona", "description": "description"}))
+    res = asyncio.run(workflow.run(user_prompt="New case regareding murder of Rajat Moona"))
     print(res)

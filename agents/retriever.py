@@ -158,7 +158,7 @@ Remember: Your goal is to find the most relevant legal information. If results a
         
         # if 0 <= state["thought_step"]+1 < len(self.get_thought_steps())-1:
         response = {
-            "messages": [HumanMessage(content=result["response"], name="retriever")],
+            "messages": [HumanMessage(content=result.content, name="retriever")],
             "next": state["caller"],
             "thought_step": state["thought_step"]
         }
