@@ -1,24 +1,23 @@
 import os
-import asyncio
-from typing import Dict, Any, List, Optional, TypedDict
-from .base import AgentState
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.tools import BaseTool
+from typing import Dict, Any, List, Optional
+from langchain_google_genai import ChatGoogleGenerativeAI
+from .base import BaseAgent, AgentState, AgentResponse
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
-from groq import Groq
 import argparse
 from dotenv import load_dotenv
 
-
 class KeywordExtractorAgent:
-    def __init__(self, documents: List[Any]):
+    def __init__(self,
+        documents: List[Any],
+        llm: Optional[ChatGoogleGenerativeAI] = None
+    ):
         self.documents = documents
-
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("Groq API key not found in environment variables.")
-        self.client = Groq(api_key=api_key)
+        self.llm = llm or ChatGoogleGenerativeAI(
+            model="gemini-pro",
+            temperature=0,
+            convert_system_message_to_human=True
+        )
 
         # Define the system prompt for the task
         self.system_prompt = {
@@ -39,43 +38,40 @@ class KeywordExtractorAgent:
             """
         }
 
-        # Initialize chat history with the system prompt
-        self.chat_history = [self.system_prompt]
-
-    def extract_keywords(self, user_case: str) -> Dict[str, Any]:
+    async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
         """Extract relevant keywords based on the user's case and documents."""
         documents_content = "\n".join([doc.content for doc in self.documents])
-
-        self.chat_history.append({
-            "role": "user",
-            "content": f"""User Case Description:
+        prompt = f"""User Case Description:
 {user_case}
 
 Relevant Documents:
 {documents_content}
 
-Based on the above user case and documents, extract a list of TOP 5 relevant keywords, phrases, or legal terms that the user can use to search for supportive cases and information. The keywords should be specific to the user's case and cover all important aspects. Do Not provide anything else than the keywords. No reasoning is needed.
+Based on the above user case and documents, extract a list of relevant keywords, phrases, and legal terms that the user can use to search for supportive cases and information. The keywords should be specific to the user's case and cover all important aspects.
 
-Provide the list of just the 5 most relevant keywords in bullet point format.
+Provide the list of keywords in bullet point format.
 """
-        })
+        response = self._get_llm_response(prompt)
+        keywords = self._parse_keywords(response)
+        return keywords
 
-        # Send the request
-        print("Sending request to Groq API...")
-        response = self.client.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=self.chat_history,
-            max_tokens=100,
-            temperature=1.2
-        )
-        print("Response received from Groq API.")
-
-        return self._parse_keywords(response.choices[0].message.content)
+    def _get_llm_response(self, prompt: str) -> str:
+        """Get response from the Gemini-pro LLM."""
+        response = self.llm.invoke([
+            {"role": "system", "content": self.system_prompt['content']},
+            {"role": "user", "content": prompt}
+        ])
+        return response.content
 
     def _parse_keywords(self, response: str) -> Dict[str, Any]:
         """Parse the response to extract keywords."""
         lines = response.strip().split("\n")
-        keywords = [line.strip("- ").strip() for line in lines if line.strip()]
+        keywords = [
+            line.strip("- ").strip() 
+            for line in lines
+            if line.strip()
+        ]
+        # Return the keywords only once in the correct structure
         return {"type": "keywords", "keywords": keywords}
 
 
@@ -86,21 +82,15 @@ class Document:
     def __init__(self, content: str):
         self.content = content
 
-class FetchingAgent:
+class FetchingAgent(BaseAgent):
     """Agent responsible for fetching relevant docs from the kanoon api"""
     
-    def __init__(
-        self,
-        # llm: Optional[BaseChatModel] = None,
-        # tools: Optional[List[BaseTool]] = None,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         print("initialised kanoon fetcher...")
-        # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
-        # self.tools = tools or []
+        super().__init__(**kwargs)
 
     
-    async def process(self, state: AgentState) -> AgentState:
+    async def process(self, state: AgentState) -> AgentResponse:
         """Process current state with fetching-specific logic"""
         kanoon_api_key = os.getenv("KANOON_API_KEY")
         if not kanoon_api_key:
@@ -149,15 +139,13 @@ class FetchingAgent:
             ),
         ]
 
-        # docs = state["messages"][-1].content
-        
         # Extract Keywords
         agent = KeywordExtractorAgent(documents=documents)
-        keywords_result = agent.extract_keywords(user_case=state["messages"][-1].content)
+        keywords_result = await agent.extract_keywords(user_case=user_case)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases
         print("Extracted Keywords:")
-        keywords = keywords_result["keywords"][1:]  # Skip the first line
+        keywords = keywords_result["keywords"]
         for keyword in keywords:
             print(f"- {keyword}")
 
