@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Any, List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
-from .base import BaseAgent, AgentState, AgentResponse
+from .base import AgentState
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 import argparse
@@ -82,15 +82,15 @@ class Document:
     def __init__(self, content: str):
         self.content = content
 
-class FetchingAgent(BaseAgent):
+class FetchingAgent:
     """Agent responsible for fetching relevant docs from the kanoon api"""
     
     def __init__(self, **kwargs):
         print("initialised kanoon fetcher...")
-        super().__init__(**kwargs)
+        # super().__init__(**kwargs)
 
     
-    async def process(self, state: AgentState) -> AgentResponse:
+    async def process(self, state: AgentState) -> AgentState:
         """Process current state with fetching-specific logic"""
         kanoon_api_key = os.getenv("KANOON_API_KEY")
         if not kanoon_api_key:
@@ -141,7 +141,7 @@ class FetchingAgent(BaseAgent):
 
         # Extract Keywords
         agent = KeywordExtractorAgent(documents=documents)
-        keywords_result = await agent.extract_keywords(user_case=user_case)  # Await the coroutine
+        keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases
         print("Extracted Keywords:")

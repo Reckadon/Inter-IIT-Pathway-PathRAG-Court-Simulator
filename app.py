@@ -2,7 +2,13 @@
 from core.workflow import TrialWorkflow
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent, WebSearcherAgent
 import asyncio
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os
 
+llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+# llm = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY'])
+# llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", api_key=os.getenv('GOOGLE_API_KEY'))
 
 if __name__ == "__main__":
     print("running the app.py file...\n")
@@ -10,12 +16,12 @@ if __name__ == "__main__":
     # docs = "/documents"
 
     workflow = TrialWorkflow(
-        lawyer=LawyerAgent(),
-        prosecutor=ProsecutorAgent(),
-        judge=JudgeAgent(),
-        retriever=RetrieverAgent(),
-        kanoon_fetcher = FetchingAgent(),
-        web_searcher = WebSearcherAgent()
+        lawyer=LawyerAgent(llm=llm),
+        prosecutor=ProsecutorAgent(llm=llm),
+        judge=JudgeAgent(llm=llm),
+        retriever=RetrieverAgent(llm=llm),
+        kanoon_fetcher = FetchingAgent(llm=llm),
+        web_searcher = WebSearcherAgent(llm=llm)
     )
 
     workflow.visualize()

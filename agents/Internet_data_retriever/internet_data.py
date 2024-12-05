@@ -14,13 +14,14 @@ print("GROQ_API_KEY loaded:", "Yes" if os.environ.get('GROQ_API_KEY') else "No")
 print("Actual GROQ_API_KEY:", "Present" if os.environ.get('GROQ_API_KEY') is not None else "Missing")
 
 class DataRetrievalCrew:
-    def __init__(self, argument):
+    def __init__(self, argument, llm):
         self.argument = argument
+        self.llm = llm
    
 
     def run(self):
         # Define your custom agents and tasks in agents.py and tasks.py
-        agents = DataRetrieverAgents()
+        agents = DataRetrieverAgents(llm=self.llm)
         tasks = RetrievalTasks()
 
         # Define your custom agents and tasks here
