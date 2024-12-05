@@ -7,7 +7,7 @@ import urllib.parse
 
 
 class IKApi:
-    def _init_(self, args, storage):
+    def __init__(self, args, storage):
         self.logger = logging.getLogger('ikapi')
         self.headers = {'Authorization': f'Token {args.token}', 'Accept': 'application/json'}
         self.basehost = 'api.indiankanoon.org'
