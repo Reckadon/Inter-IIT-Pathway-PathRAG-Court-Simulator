@@ -16,7 +16,7 @@ load_dotenv()
 
 def create_law_retriever() -> BaseTool:
     """Create vector store retriever for legal documents"""
-    public_store = PathwayVectorStore('public', './documents', 8765)
+    public_store = PathwayVectorStore('public', './public/documents', 8765)
 
     public_client = public_store.get_client()
     
@@ -83,7 +83,7 @@ Do only current task at a time. Avoid very long responses.
 
             
         
-        for i in range(5): # max 5 iterations
+        for i in range(1): # max 5 iterations
             #formulate query
             messages.append({"role": "system", "content": "need_info: " + info_analysis.content + "\n" + "current_task: " + self.get_thought_steps()[1]})
             query = self.llm.invoke(messages)

@@ -46,14 +46,14 @@ you will go through the following chain of thought steps:
 3. Assess if information from the web is required
 4. Argument construction
 
-Do only current task at a time. Avoid very long responses.
+Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
         """Get prosecutor-specific chain of thought steps"""
         return [
             "1. Review the case files, analyze the user's arguments to identify weaknesses or inconsistencies in their claims and plan a strategy to build strong arguments against the defendant, ensuring they are logically sound and factually supported.",
-            "2. Determine the specific legal information(e.g., laws, IPCs) required to strengthen your arguments or refute the user's points. Clearly ask the law retriever agent for the necessary details.",
+            "2. Determine the specific legal information(e.g., laws, IPCs, precedents) required to strengthen your arguments or refute the user's points. Clearly ask the law retriever agent for the necessary details.",
             "3. Evaluate if additional web-based information is needed. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
             "4. Construct a comprehensive argument or counterargument based on the retrieved data and your planed strategy. Write the response as live dialogue (avoid bullet points), maintaining logical coherence and factual accuracy."
         ]

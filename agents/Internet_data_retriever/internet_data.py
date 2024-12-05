@@ -28,10 +28,10 @@ class DataRetrievalCrew:
         legal_assistant = agents.legal_assistant()
 
         # Define tasks
-        search_queries_task = tasks.generate_search_queries(legal_researcher, argument)
-        retrieve_info_task = tasks.retrieve_information(legal_researcher, argument)
-        formulate_counterargument_task = tasks.formulate_counterargument(legal_researcher, argument)
-        # evaluate_counterargument_task = tasks.evaluate_counterargument(legal_assistant, argument)
+        search_queries_task = tasks.generate_search_queries(legal_researcher, self.argument)
+        retrieve_info_task = tasks.retrieve_information(legal_researcher, self.argument)
+        formulate_counterargument_task = tasks.formulate_counterargument(legal_researcher, self.argument)
+        # evaluate_counterargument_task = tasks.evaluate_counterargument(legal_assistant, self.argument)
 
         # Create the crew with sequential processing
         crew1 = Crew(

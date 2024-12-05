@@ -44,14 +44,14 @@ you will go through the following chain of thought steps:
 3. Assess if information from the web is required
 4. Argument construction
 
-Do only current task at a time. Avoid very long responses.
+Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
         """Get lawyer-specific chain of thought steps"""
         return [
             "1. Go through the case files and current state of the courtroom. Plan a strategy to make a strong argument in favor of the user.",
-            "2. Identify the specific information needed to support the argument (e.g., laws, IPCs). Clearly ask the law retriever agent for this information.",
+            "2. Identify the specific information needed to support the argument (e.g., laws, IPCs, precedents). Clearly ask the law retriever agent for this information.",
             "3. Assess if additional information from the web is required. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
             "4. Construct a coherent and persuasive argument based on data received and the planned strategy. Write the response as live dialogue (avoid bullet points), and ensure it is fact-based and free from hallucinations."
         ]

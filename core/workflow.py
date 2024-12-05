@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 import os
 
-from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent
+from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent, WebSearcherAgent
 from .state import AgentState
 
 class TrialWorkflow:
@@ -16,13 +16,15 @@ class TrialWorkflow:
         prosecutor: ProsecutorAgent,
         judge: JudgeAgent,
         retriever: RetrieverAgent,
-        kanoon_fetcher: FetchingAgent
+        kanoon_fetcher: FetchingAgent,
+        web_searcher: WebSearcherAgent
     ):
         self.lawyer = lawyer
         self.prosecutor = prosecutor
         self.judge = judge
         self.retriever = retriever # or RetrieverAgent(docs=docs)
         self.kanoon_fetcher = kanoon_fetcher
+        self.web_searcher = web_searcher
         self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
@@ -36,7 +38,7 @@ class TrialWorkflow:
         workflow.add_node("lawyer", self._lawyer_node)
         workflow.add_node("prosecutor", self._prosecutor_node)
         workflow.add_node("retriever", self._retriever_node)
-        workflow.add_node("web_search", self._web_search_node)
+        workflow.add_node("web_searcher", self._web_search_node)
         
         # Start with judge
         workflow.add_edge(START, "kanoon_fetcher")
@@ -51,7 +53,7 @@ class TrialWorkflow:
                 "prosecutor": "prosecutor",
                 "retriever": "retriever",
                 "self": "judge",
-                "web_search": "web_search",
+                "web_searcher": "web_searcher",
                 "END": END
             }
         )
@@ -63,7 +65,7 @@ class TrialWorkflow:
             {
                 "judge": "judge",
                 "retriever": "retriever",
-                "web_search": "web_search",
+                "web_searcher": "web_searcher",
                 "self": "lawyer"  # For Chain of Thought
             }
         )
@@ -75,7 +77,7 @@ class TrialWorkflow:
             {
                 "judge": "judge",
                 "retriever": "retriever",
-                "web_search": "web_search",
+                "web_searcher": "web_searcher",
                 "self": "prosecutor"  # For Chain of Thought
             }
         )
@@ -93,11 +95,12 @@ class TrialWorkflow:
 
         # Web Search returns to calling agent
         workflow.add_conditional_edges(
-            "web_search",
+            "web_searcher",
             self._route_from_retriever,
             {
                 "judge": "judge",
-                "self": "web_search"
+                "lawyer": "lawyer",
+                "prosecutor": "prosecutor"
             }
         )
         
@@ -109,28 +112,28 @@ class TrialWorkflow:
     
     async def _judge_node(self, state: AgentState) -> AgentState:
         """Judge node processing"""
-        print(f"Judge node processing with state: {state}")
+        # print(f"Judge node processing with state: {state}")
         return await self.judge.process(state)
     
     async def _lawyer_node(self, state: AgentState) -> AgentState:
         """Lawyer node processing"""
-        print(f"Lawyer node processing with state: {state}")
+        # print(f"Lawyer node processing with state: {state}")
         return await self.lawyer.process(state)
     
     async def _prosecutor_node(self, state: AgentState) -> AgentState:
         """Prosecutor node processing"""
-        print(f"Prosecutor node processing with state: {state}")
+        # print(f"Prosecutor node processing with state: {state}")
         return await self.prosecutor.process(state)
     
     async def _retriever_node(self, state: AgentState) -> AgentState:
         """Retriever node processing"""
-        print(f"Retriever node processing with state: {state}")
+        # print(f"Retriever node processing with state: {state}")
         return await self.retriever.process(state)
     
     async def _web_search_node(self, state: AgentState) -> AgentState:
         """Web Search node processing"""
-        print(f"Web Search node processing with state: {state}")
-        return await self.web_search.process(state)
+        # print(f"Web Search node processing with state: {state}")
+        return await self.web_searcher.process(state)
     
     def _route_from_judge(self, state: AgentState) -> str:
         """Route based on judge's decision"""
@@ -165,21 +168,27 @@ class TrialWorkflow:
             ],
             next="kanoon_fetcher",
             thought_step=0,
-            # cot_finished=True
         )
+
+        print(f"Initial state: {initial_state}")
+        
+        async for a in self.graph.astream(initial_state):
+            print(a)
+            print("-"*100)
+
         
         # Run the workflow
-        final_state = await self.graph.ainvoke(initial_state)
+        # final_state = await self.graph.ainvoke(initial_state)
         
         # Extract results
-        return {
-            "messages": final_state["messages"],
-            "verdict": next(
-                (msg for msg in reversed(final_state["messages"]) 
-                 if hasattr(msg, "name") and msg.name == "judge"),
-                None
-            )
-        }
+        # return {
+        #     "messages": final_state["messages"],
+        #     "verdict": next(
+        #         (msg for msg in reversed(final_state["messages"]) 
+        #          if hasattr(msg, "name") and msg.name == "judge"),
+        #         None
+        #     )
+        # }
     
     def visualize(self):
         """Visualize the workflow graph"""
