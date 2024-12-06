@@ -2,7 +2,7 @@ import asyncio
 import aiohttp
 import streamlit as st
 import json
-import re
+import os
 from pathlib import Path
 
 # Create private_documents directory if it doesn't exist

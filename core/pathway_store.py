@@ -33,12 +33,9 @@ class PathwayVectorStore:
                 with_metadata=True,
             )
 
-            # Apply the parser to the PDF data
-            # self.documents = self.data_sources.select(data=parser(pw.this.data))
-
+            # splitter to be used with VectorStore
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=10)   
            
-
             embeddings_model = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
                 # model_name = "law-ai/InLegalBERT"
@@ -61,30 +58,16 @@ class PathwayVectorStore:
 
             time.sleep(30)
             
-            print("\nmaking client using langchain's pathwayvectorclient...\n")
+            # making client using langchain's pathwayvectorclient..
             self.client = PathwayVectorClient(
                 host="127.0.0.1",
                 port=port,
             )   
-            print("\n made client..")
 
 
         except Exception as e:
             raise RuntimeError(f"Failed to initialize vector store: {str(e)}")
 
-    # def add_item(self, item_name, quantity, price):
-    #     """
-    #     Add an item to the Vector store.
-
-    #     Parameters:
-    #     item_name (str): The name of the item.
-    #     quantity (int): The quantity of the item.
-    #     price (float): The price of the item.
-    #     """
-    #     if item_name in self.inventory:
-    #         self.inventory[item_name]['quantity'] += quantity
-    #     else:
-    #         self.inventory[item_name] = {'quantity': quantity, 'price': price}
 
     def get_client(self):
         """
@@ -98,7 +81,7 @@ class PathwayVectorStore:
 
 
 
-if __name__ == "__main__":    # example usage
+if __name__ == "__main__":    # example/test usage
     public_db = PathwayVectorStore('xyztest', './public_documents', 8765)
     print('making a query')
     result = public_db.get_client().as_retriever().invoke("IPC 345")

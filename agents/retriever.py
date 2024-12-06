@@ -27,14 +27,14 @@ def create_law_retriever(private=False) -> BaseTool:
 
     return retriever
    
-class RetrieverResponse(BaseModel):
-    """Structured retriever response"""
-    # response: str = Field(description="The retriever's assessment of the retrieved content")
-    is_enough: bool = Field(description="Whether the retrieved content is enough to answer the request")
+# class RetrieverResponse(BaseModel):
+#     """Structured retriever response"""
+#     # response: str = Field(description="The retriever's assessment of the retrieved content")
+#     is_enough: bool = Field(description="Whether the retrieved content is enough to answer the request")
 
-class Queries(BaseModel):
-    private_query: str = Field(description="Query for private retriever (user case files or documents). 'none' if not needed")  
-    public_query: str = Field(description="Query for public retriever (public docs like IPC, legal case precedents, etc) 'none' if not needed")
+# class Queries(BaseModel):
+#     private_query: str = Field(description="Query for private retriever (user case files or documents). 'none' if not needed")  
+#     public_query: str = Field(description="Query for public retriever (public docs like IPC, legal case precedents, etc) 'none' if not needed")
 class RetrieverAgent:
     """Agent for retrieving and analyzing legal documents from vector store"""
     
@@ -68,9 +68,10 @@ Do only current task at a time. Avoid very long responses.
         """Get retriever-specific chain of thought steps"""
         return [
             "1. Analyze the information request received from the lawyer or prosecutor and Note the key words and points.",
-            "2. Form very good queries to Retrieve the most relevant text needed. one query for each private retriever (user case files or documents) or public retriever (contains public docs like IPC, legal case precedents, etc) 'none' if a specific retriever is not needed.",
-            "3. Assess the retrieved results and determine If they are relevent and enough. if yes, set 'is_enough' to True. if not, set 'is_enough' false",
-            "4. Provide the lawyer or prosecutor with accurate excerpts of relevant laws based on the request, ensuring clarity.If no relevant law is found, respond with 'No relevant law found in database.'"
+            "2. Accordiing to the resqusted information, if private_retriever(user case files or user documents) is needed, form a query for it. if not respond with only 'none'",
+            "3. Accordiing to the resqusted information, if public_retriever(contains public docs like IPC, legal case precedents, etc) is needed, form a query for it. if not respond with only 'none'",
+            "4. Assess the retrieved results and determine If they are relevent and enough. if yes, respond with keyword 'is_enough', if not respond with keyword 'not_enough'",
+            "5. Provide the lawyer or prosecutor with accurate excerpts of relevant laws based on the request, ensuring clarity.If no relevant law is found, respond with 'No relevant law found in database.'"
         ]
 
     async def process(self, state: AgentState) -> AgentState:
@@ -97,28 +98,29 @@ Do only current task at a time. Avoid very long responses.
             # queries = self.llm.with_structured_output(Queries).invoke(messages)
             for i,llm in enumerate(self.llms):
                 try:
-                    queries = llm.with_structured_output(Queries).invoke(messages)
+                    private_query = llm.invoke(messages)
+                    public_query = llm.invoke(messages)
                     break
                 except Exception as e:
                     print(f"LLM {i} failed with error: {e}")
 
             #retrieve
-            private_retrieved_content = self.private_retriever.invoke(queries.private_query) if queries.private_query.lower() != 'none' else 'None'
-            public_retrieved_content = self.public_retriever.invoke(queries.public_query) if queries.public_query.lower() != 'none' else 'None'
+            private_retrieved_content = self.private_retriever.invoke(private_query.content) if private_query.content.lower() != 'none' else 'None'
+            public_retrieved_content = self.public_retriever.invoke(public_query.content) if public_query.content.lower() != 'none' else 'None'
 
             #assess
             messages.append({"role": "system", "content": "private_retrieved_content: " + str(private_retrieved_content) + "\npublic_retrieved_content: " + str(public_retrieved_content) + "\ncurrent_task: " + self.get_thought_steps()[2]})
             # assessment = self.llm.with_structured_output(RetrieverResponse).invoke(messages)
             for i,llm in enumerate(self.llms):
                 try:
-                    assessment = llm.with_structured_output(RetrieverResponse).invoke(messages)
+                    assessment = llm.invoke(messages)
                     break
                 except Exception as e:
                     print(f"LLM {i} failed with error: {e}")
                     continue
 
             #continue
-            if assessment.is_enough:
+            if "not_enough" not in assessment.content.lower():
                 break
 
                 

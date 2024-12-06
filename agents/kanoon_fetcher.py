@@ -5,6 +5,7 @@ from .base import AgentState
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 import argparse
+import json
 from dotenv import load_dotenv
 
 # Class to handle keyword extraction from legal documents
@@ -32,6 +33,7 @@ class KeywordExtractorAgent:
             - Focus on legal terms, case identifiers, statutory references, key legal concepts, and any unique aspects of the case.
             - Consider synonyms and related terms that might be used in legal databases.
             - Do not include irrelevant information or overly general terms.
+            - Give only top 5 most relevant keywords.
             """
         }
     async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
@@ -53,7 +55,7 @@ Provide the list of keywords in bullet point format.
         return keywords
 
     def _get_llm_response(self, prompt: str) -> str:
-        """Get response from the Gemini-pro LLM."""
+        """Get response from the LLM."""
         # response = self.llm.invoke([
         #     {"role": "system", "content": self.system_prompt['content']},
         #     {"role": "user", "content": prompt}
@@ -157,3 +159,63 @@ class FetchingAgent:
             
         # Print the total number of documents fetched
         print(f"Total documents fetched: {len(all_doc_ids)}")
+
+        # converting fetched json data from the API to texts
+        # Path to the 'public' directory
+        base_path = "public_documents"
+
+        # Loop through all unique subfolders in the base directory
+        for unique_folder in os.listdir(base_path):
+            unique_folder_path = os.path.join(base_path, unique_folder)
+            
+            # Skip if not a folder
+            if not os.path.isdir(unique_folder_path):
+                continue
+            
+            # Text content to combine for the current unique folder
+            combined_text = []
+            
+            # Traverse the hierarchy within the unique folder
+            for court_folder in os.listdir(unique_folder_path):
+                court_folder_path = os.path.join(unique_folder_path, court_folder)
+                
+                if not os.path.isdir(court_folder_path):
+                    continue
+                
+                for year_folder in os.listdir(court_folder_path):
+                    year_folder_path = os.path.join(court_folder_path, year_folder)
+                    
+                    if not os.path.isdir(year_folder_path):
+                        continue
+                    
+                    for date_folder in os.listdir(year_folder_path):
+                        date_folder_path = os.path.join(year_folder_path, date_folder)
+                        
+                        if not os.path.isdir(date_folder_path):
+                            continue
+                        
+                        # Process each JSON file in the date folder
+                        for file_name in os.listdir(date_folder_path):
+                            file_path = os.path.join(date_folder_path, file_name)
+                            
+                            # Skip if not a JSON file
+                            if not file_name.endswith(".json"):
+                                continue
+                            
+                            try:
+                                # Load and extract JSON content
+                                with open(file_path, "r", encoding="utf-8") as json_file:
+                                    data = json.load(json_file)
+                                    
+                                    # Convert JSON content to string and append to combined_text
+                                    combined_text.append(json.dumps(data, indent=4))
+                            except Exception as e:
+                                print(f"Error processing file {file_path}: {e}")
+            
+            # Write the combined text to a single file named after the unique folder
+            if combined_text:
+                output_file_path = os.path.join(base_path, f"{unique_folder}.txt")
+                with open(output_file_path, "w", encoding="utf-8") as output_file:
+                    output_file.write("\n\n".join(combined_text))
+                print(f"Created combined text file: {output_file_path}")
+
