@@ -5,20 +5,12 @@ import pathway as pw
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores.pathway import PathwayVectorClient
 from pathway.xpacks.llm.vector_store import VectorStoreServer
-from pathway.xpacks.llm.parsers import OpenParse
 import time
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # @pw.udf
 # def strip_metadata(docs: list[tuple[str, dict]]) -> list[str]:
 #     return [doc[0] for doc in docs]
-
-parser = OpenParse(table_args=None, image_args=None, parse_images = False)
-
-embeddings_model = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-    # model_name = "law-ai/InLegalBERT"
-)
 
 class PathwayVectorStore:
     def __init__(self, name, path, port):
@@ -47,14 +39,18 @@ class PathwayVectorStore:
             # Apply the parser to the PDF data
             # self.documents = self.data_sources.select(data=parser(pw.this.data))
 
-            # no splitter needed as OpenParse handles it
-            # text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=10)   
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=10)   
+           
+
+            embeddings_model = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+                # model_name = "law-ai/InLegalBERT"
+            )
 
             print(f"\nmaking VectorStore: '{self.name}'... with docs {self.data_sources}\n")
             self.vector_server = VectorStoreServer.from_langchain_components(
                 self.data_sources,
-                parser= parser,
-                splitter=None,
+                splitter=text_splitter,
                 embedder=embeddings_model,
             )
 
@@ -106,7 +102,7 @@ class PathwayVectorStore:
 
 
 if __name__ == "__main__":    # example usage
-    public_db = PathwayVectorStore('xyztest', './public_documents/', 8765)
+    public_db = PathwayVectorStore('xyztest', './public_documents', 8765)
     print('making a query')
     result = public_db.get_client().as_retriever().invoke("IPC 345")
     for entry in result:
