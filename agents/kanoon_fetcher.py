@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 # Class to handle keyword extraction from legal documents
 class KeywordExtractorAgent:
     def __init__(self,
-        documents_path: str,
+        documents: List[Any],
         llms
     ):
-        self.documents_path = documents_path
+        self.documents = documents
         self.llms = llms
 
         # Define the system prompt for the task
@@ -137,7 +137,7 @@ class FetchingAgent:
                     documents.append(content)
 
         # Extract Keywords
-        agent = KeywordExtractorAgent(documents_path="./public_documents", llms=self.llms)
+        agent = KeywordExtractorAgent(documents=documents, llms=self.llms)
         keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases

@@ -14,8 +14,8 @@ app = FastAPI()
 # Initialize LLMs
 llm_0 = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ["GROQ_API_KEY"])
 llms =[
-    ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=os.environ['GROQ_API_KEY']),
     ChatGroq(model="llama-3.1-8b-instant", groq_api_key=os.environ['GROQ_API_KEY']),
+    ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=os.environ['GROQ_API_KEY']),
     ChatGroq(model="gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY']),
     ChatGroq(model="gemma-7b-it", groq_api_key=os.environ['GROQ_API_KEY']),
     ChatGroq(model="mixtral-8x7b-32768", groq_api_key=os.environ['GROQ_API_KEY'])
