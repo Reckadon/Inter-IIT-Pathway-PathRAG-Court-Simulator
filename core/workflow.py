@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional, TypedDict, Literal
-from langgraph.graph import StateGraph, START,  END
+from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 from langgraph.checkpoint.memory import MemorySaver
@@ -10,32 +10,50 @@ from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, Fet
 from agents import AgentState
 
 class TrialWorkflow:
-    """Manages the trial workflow using LangGraph"""
+    """
+    Manages the trial workflow using LangGraph.
+    Orchestrates interactions between different agents (judge, lawyer, prosecutor etc.)
+    in a legal trial simulation.
+    """
     
     def __init__(
         self,
         lawyer: LawyerAgent,
-        prosecutor: ProsecutorAgent,
+        prosecutor: ProsecutorAgent, 
         judge: JudgeAgent,
         retriever: RetrieverAgent,
         kanoon_fetcher: FetchingAgent,
         web_searcher: WebSearcherAgent
     ):
+        """
+        Initialize the trial workflow with required agents.
+        
+        Args:
+            lawyer: Agent representing defense counsel
+            prosecutor: Agent representing prosecution
+            judge: Agent managing trial flow and making decisions
+            retriever: Agent for retrieving relevant legal information
+            kanoon_fetcher: Agent for fetching case-specific data
+            web_searcher: Agent for web searches
+        """
         self.lawyer = lawyer
         self.prosecutor = prosecutor
         self.judge = judge
-        self.retriever = retriever # or RetrieverAgent(docs=docs)
+        self.retriever = retriever
         self.kanoon_fetcher = kanoon_fetcher
         self.web_searcher = web_searcher
-        self.memory = MemorySaver()
+        self.memory = MemorySaver()  # For checkpointing workflow state
         self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
-        """Create the trial workflow graph"""
-        # Initialize the graph with AgentState
+        """
+        Create and configure the trial workflow graph.
+        Defines nodes (agents) and edges (transitions) between them.
+        """
+        # Initialize graph with AgentState as state type
         workflow = StateGraph(AgentState)
         
-        # Add agent nodes
+        # Add agent nodes to graph
         workflow.add_node("kanoon_fetcher", self._kanoon_fetcher_node)
         workflow.add_node("judge", self._judge_node)
         workflow.add_node("lawyer", self._lawyer_node)
@@ -44,18 +62,19 @@ class TrialWorkflow:
         workflow.add_node("web_searcher", self._web_search_node)
         workflow.add_node("user_feedback", self._user_feedback_node)
         
-        # Start with judge
+        # Define initial workflow path
         workflow.add_edge(START, "kanoon_fetcher")
         workflow.add_edge("kanoon_fetcher", "prosecutor")
+        
         workflow.add_edge("user_feedback", "lawyer")
         
-        # Judge manages the flow
+        # Judge's routing options
         workflow.add_conditional_edges(
             "judge",
             self._route_from_judge,
             {
                 "lawyer": "lawyer",
-                "prosecutor": "prosecutor",
+                "prosecutor": "prosecutor", 
                 "retriever": "retriever",
                 "self": "judge",
                 "web_searcher": "web_searcher",
@@ -63,7 +82,7 @@ class TrialWorkflow:
             }
         )
         
-        # Lawyer can go to judge or retriever
+        # Lawyer's routing options
         workflow.add_conditional_edges(
             "lawyer",
             self._route_from_agent,
@@ -72,11 +91,11 @@ class TrialWorkflow:
                 "retriever": "retriever",
                 "web_searcher": "web_searcher",
                 "user_feedback": "user_feedback",
-                "self": "lawyer"  # For Chain of Thought
+                "self": "lawyer"  # For chain of thought reasoning
             }
         )
         
-        # Prosecutor can go to judge or retriever
+        # Prosecutor's routing options
         workflow.add_conditional_edges(
             "prosecutor",
             self._route_from_agent,
@@ -84,11 +103,11 @@ class TrialWorkflow:
                 "judge": "judge",
                 "retriever": "retriever",
                 "web_searcher": "web_searcher",
-                "self": "prosecutor"  # For Chain of Thought
+                "self": "prosecutor"  # For chain of thought reasoning
             }
         )
         
-        # Retriever returns to calling agent
+        # Retriever routes back to calling agent
         workflow.add_conditional_edges(
             "retriever",
             self._route_from_retriever,
@@ -99,7 +118,7 @@ class TrialWorkflow:
             }
         )
 
-        # Web Search returns to calling agent
+        # Web searcher routes back to calling agent
         workflow.add_conditional_edges(
             "web_searcher",
             self._route_from_retriever,
@@ -112,6 +131,7 @@ class TrialWorkflow:
         
         return workflow.compile(checkpointer=self.memory, interrupt_before=["user_feedback"])
     
+    # Agent node processing methods
     async def _kanoon_fetcher_node(self, state: AgentState) -> AgentState:
         """Kanoon Fetcher node processing"""
         return await self.kanoon_fetcher.process(state)
@@ -146,37 +166,30 @@ class TrialWorkflow:
         # print(f"User feedback node processing with state: {state}")
         pass
     
+    # Routing logic methods
     def _route_from_judge(self, state: AgentState) -> str:
-        """Route based on judge's decision"""
-        # Check if verdict is ready
-        # if any("verdict" in msg.content.lower() 
-        #        for msg in state["messages"] if hasattr(msg, "content")):
-        #     return "END"
+        """Determine next agent based on judge's decision"""
         return state["next"]
     
     def _route_from_agent(self, state: AgentState) -> str:
-        """Route from lawyer or prosecutor"""
-        # Check for Chain of Thought continuation
-        # if not state["cot_finished"]:
-        #     return "self"
+        """Determine next step from lawyer or prosecutor actions"""
         return state["next"]
     
     def _route_from_retriever(self, state: AgentState) -> str:
-        """Route from retriever back to calling agent"""
-        # Get the last message to determine calling agent
-        # for msg in reversed(state["messages"]):
-        #     if hasattr(msg, "name"):
-        #         if msg.name in ["lawyer", "prosecutor"]:
-        #             return msg.name
-        return state["next"]  # Default to judge if can't determine
+        """Route back to the agent that called the retriever"""
+        return state["next"]
     
     async def run(self, user_prompt: str):
-        """Run the trial workflow as an async generator."""
-        # Initialize state
+        """
+        Run the trial workflow as an async generator.
+        Handles the main execution loop including user feedback.
+        
+        Args:
+            user_prompt: Initial prompt to start the trial
+        """
+        # Set up initial state
         initial_state = AgentState(
-            messages=[
-                HumanMessage(content=user_prompt)
-            ],
+            messages=[HumanMessage(content=user_prompt)],
             next="kanoon_fetcher",
             thought_step=0,
         )
@@ -199,10 +212,11 @@ class TrialWorkflow:
                 "content": repr(state)
             }
 
+        # Simulate user feedback loop
         user_input = "argument is not strong"
 
         while True:
-            # Update graph with user feedback
+            # Process user feedback
             self.graph.update_state(values={"user_feedback": user_input}, as_node="user_feedback")
 
             async for state in self.graph.astream(None, thread):
@@ -213,13 +227,12 @@ class TrialWorkflow:
                     "content": repr(state)
                 }
                 
-            # Break when the judge signals end of workflow
+            # Check for workflow completion
             try:
                 if state.judge.next == 'END':
                     yield {"status": "done", "message": "Workflow completed successfully"}
                     break
             except AttributeError:
-                # Handle cases where `state.judge` is not present
                 pass
 
 
@@ -238,23 +251,13 @@ class TrialWorkflow:
         # }
     
     def visualize(self):
-        """Visualize the workflow graph"""
-
+        """
+        Generate and save visualization of the workflow graph.
+        Outputs a PNG file showing the graph structure.
+        """
         png_graph = self.graph.get_graph().draw_mermaid_png()
         with open("my_graph.png", "wb") as f:
             f.write(png_graph)
 
         print(f"Graph saved as 'my_graph.png' in {os.getcwd()}")
-
-    #     # Clean up by removing the image file
-    #     # os.remove(graph_path)
-
-    # def visualize(self):
-    #     """Visualize the workflow graph"""
-    #     try:
-    #         from IPython.display import Image, display
-    #         display(Image(self.graph.get_graph().draw_mermaid_png()))
-    #     except ImportError:
-    #         print("IPython display not available. Install IPython to visualize the graph.")
-
 

@@ -9,15 +9,12 @@ from dotenv import load_dotenv
 
 class KeywordExtractorAgent:
     def __init__(self,
-        documents: List[Any],
+        documents_path: str,
         llms
     ):
-        self.documents = documents
-        # self.llm = llm or ChatGoogleGenerativeAI(
-        #     model="gemini-1.5-flash",
-        #     temperature=0
-        # )
+        self.documents_path = documents_path
         self.llms = llms
+
         # Define the system prompt for the task
         self.system_prompt = {
             "role": "system",
@@ -39,7 +36,7 @@ class KeywordExtractorAgent:
 
     async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
         """Extract relevant keywords based on the user's case and documents."""
-        documents_content = "\n".join([doc.content for doc in self.documents])
+        documents_content = FileStorage(self.documents_path).get_all_files_content()
         prompt = f"""User Case Description:
 {user_case}
 
@@ -150,7 +147,7 @@ class FetchingAgent:
         ]
 
         # Extract Keywords
-        agent = KeywordExtractorAgent(documents=documents, llms=self.llms)
+        agent = KeywordExtractorAgent(documents_path="./public_documents", llms=self.llms)
         keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases
