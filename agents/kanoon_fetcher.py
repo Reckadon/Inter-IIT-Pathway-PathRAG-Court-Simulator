@@ -7,10 +7,11 @@ from .misc.ik import IKApi
 import argparse
 from dotenv import load_dotenv
 
+# Class to handle keyword extraction from legal documents
 class KeywordExtractorAgent:
     def __init__(self,
-        documents: List[Any],
-        llms
+        documents: List[Any], # List of documents to process
+        llms # List of LLMs for handling tasks
     ):
         self.documents = documents
         # self.llm = llm or ChatGoogleGenerativeAI(
@@ -36,7 +37,6 @@ class KeywordExtractorAgent:
             - Do not include irrelevant information or overly general terms.
             """
         }
-
     async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
         """Extract relevant keywords based on the user's case and documents."""
         documents_content = "\n".join([doc.content for doc in self.documents])
@@ -149,7 +149,7 @@ class FetchingAgent:
             ),
         ]
 
-        # Extract Keywords
+        # Step1: Extract Keywords
         agent = KeywordExtractorAgent(documents=documents, llms=self.llms)
         keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
@@ -163,9 +163,10 @@ class FetchingAgent:
         MAX_DOCS_PER_KEYWORD = 2
 
         all_doc_ids = []
-        for keyword in keywords[:5]:
+        for keyword in keywords[:5]: # Use only the first 5 keywords
             print(f"Searching for keyword: {keyword}")
             doc_ids = ikapi.save_search_results(keyword, max_docs=MAX_DOCS_PER_KEYWORD)
             all_doc_ids.extend(doc_ids)
-
+            
+        # Print the total number of documents fetched
         print(f"Total documents fetched: {len(all_doc_ids)}")
