@@ -5,7 +5,7 @@ from .base import AgentState
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 import argparse
-from langchain.document_loaders import PyPDFLoader
+import json
 from dotenv import load_dotenv
 
 # Class to handle keyword extraction from legal documents
@@ -160,53 +160,61 @@ class FetchingAgent:
         # Print the total number of documents fetched
         print(f"Total documents fetched: {len(all_doc_ids)}")
 
-        # converting fetched pdfs to texts
+        # converting fetched json data from the API to texts
         # Path to the 'public' directory
         base_path = "public_documents"
 
-        # Loop through all subfolders in the base directory
-        for top_level_folder in os.listdir(base_path):
-            top_level_path = os.path.join(base_path, top_level_folder)
+        # Loop through all unique subfolders in the base directory
+        for unique_folder in os.listdir(base_path):
+            unique_folder_path = os.path.join(base_path, unique_folder)
             
             # Skip if not a folder
-            if not os.path.isdir(top_level_path):
+            if not os.path.isdir(unique_folder_path):
                 continue
             
-            # Text content to combine for the current top-level folder
+            # Text content to combine for the current unique folder
             combined_text = []
             
-            # Process each subfolder within the top-level folder
-            for subfolder in os.listdir(top_level_path):
-                subfolder_path = os.path.join(top_level_path, subfolder)
+            # Traverse the hierarchy within the unique folder
+            for court_folder in os.listdir(unique_folder_path):
+                court_folder_path = os.path.join(unique_folder_path, court_folder)
                 
-                # Skip if not a folder
-                if not os.path.isdir(subfolder_path):
+                if not os.path.isdir(court_folder_path):
                     continue
                 
-                # Process each file within the subfolder
-                for file_name in os.listdir(subfolder_path):
-                    file_path = os.path.join(subfolder_path, file_name)
+                for year_folder in os.listdir(court_folder_path):
+                    year_folder_path = os.path.join(court_folder_path, year_folder)
                     
-                    # Skip toc.txt
-                    if file_name == "toc.txt":
+                    if not os.path.isdir(year_folder_path):
                         continue
                     
-                    # Check if the file is a PDF
-                    if file_name.endswith(".pdf"):
-                        try:
-                            # Load and extract text using PyPDFLoader
-                            loader = PyPDFLoader(file_path)
-                            documents = loader.load()
+                    for date_folder in os.listdir(year_folder_path):
+                        date_folder_path = os.path.join(year_folder_path, date_folder)
+                        
+                        if not os.path.isdir(date_folder_path):
+                            continue
+                        
+                        # Process each JSON file in the date folder
+                        for file_name in os.listdir(date_folder_path):
+                            file_path = os.path.join(date_folder_path, file_name)
                             
-                            # Append extracted text to the combined list
-                            for doc in documents:
-                                combined_text.append(doc.page_content)
-                        except Exception as e:
-                            print(f"Error processing file {file_path}: {e}")
+                            # Skip if not a JSON file
+                            if not file_name.endswith(".json"):
+                                continue
+                            
+                            try:
+                                # Load and extract JSON content
+                                with open(file_path, "r", encoding="utf-8") as json_file:
+                                    data = json.load(json_file)
+                                    
+                                    # Convert JSON content to string and append to combined_text
+                                    combined_text.append(json.dumps(data, indent=4))
+                            except Exception as e:
+                                print(f"Error processing file {file_path}: {e}")
             
-            # Write the combined text to a single file named after the top-level folder
+            # Write the combined text to a single file named after the unique folder
             if combined_text:
-                output_file_path = os.path.join(base_path, f"{top_level_folder}.txt")
+                output_file_path = os.path.join(base_path, f"{unique_folder}.txt")
                 with open(output_file_path, "w", encoding="utf-8") as output_file:
                     output_file.write("\n\n".join(combined_text))
                 print(f"Created combined text file: {output_file_path}")
