@@ -1,6 +1,3 @@
-import os
-os.environ["TESSDATA_PREFIX"] = "/usr/share/tesseract/tessdata/"
-
 import pathway as pw
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores.pathway import PathwayVectorClient
