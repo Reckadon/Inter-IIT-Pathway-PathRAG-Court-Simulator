@@ -3,7 +3,7 @@ import glob
 import csv
 import re
 import datetime
-
+import hashlib
 
 def get_dateobj(datestr):
     """Convert a date string to a datetime.date object."""
@@ -38,7 +38,8 @@ class FileStorage:
         Normalizes keyword names to avoid invalid characters in directories.
         """
         sanitized_keyword = re.sub(r'[^\w\s]', '_', keyword).replace(" ", "_")
-        keyword_dir = os.path.join(self.datadir, sanitized_keyword)
+        keyword_hash = hashlib.md5(sanitized_keyword.encode()).hexdigest()
+        keyword_dir = os.path.join(self.datadir, keyword_hash)
         os.makedirs(keyword_dir, exist_ok=True)
         return keyword_dir
 
