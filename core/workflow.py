@@ -200,7 +200,7 @@ class TrialWorkflow:
 
         yield {
             "status": "progress",
-            "state": "Initializing workflow...",
+            "content": "Initializing workflow...",
         }
 
         # Stream initial workflow states
@@ -230,12 +230,10 @@ class TrialWorkflow:
             # Check for workflow completion
             try:
                 if state.judge.next == 'END':
-                    yield {"status": "done", "message": "Workflow completed successfully"}
+                    yield {"status": "done", "content": "Workflow completed successfully"}
                     break
             except AttributeError:
                 pass
-
-
         
         # Run the workflow
         # final_state = await self.graph.ainvoke(initial_state)
