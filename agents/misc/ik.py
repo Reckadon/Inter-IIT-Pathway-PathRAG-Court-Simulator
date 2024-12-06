@@ -8,10 +8,20 @@ import urllib.parse
 
 class IKApi:
     def __init__(self, args, storage):
+        
+        # Initialize logger for debugging
         self.logger = logging.getLogger('ikapi')
+
+        # Set headers for API authentication and data format
         self.headers = {'Authorization': f'Token {args.token}', 'Accept': 'application/json'}
+
+        # Base host URL for the API
         self.basehost = 'api.indiankanoon.org'
+
+        # Storage handler for saving and accessing files
         self.storage = storage
+
+        # Configuration parameters
         self.maxcites = args.maxcites
         self.maxcitedby = args.maxcitedby
         self.orig = args.orig
@@ -19,16 +29,19 @@ class IKApi:
         self.pathbysrc = args.pathbysrc
 
     def call_api(self, url):
+        """Makes an API call with retries in case of SSL or HTTP errors."""
         max_retries = 3
         for attempt in range(max_retries):
             connection = None
             try:
+                # Establish HTTPS connection to the API
                 connection = http.client.HTTPSConnection(self.basehost)
                 connection.request('POST', url, headers=self.headers)
                 response = connection.getresponse()
                 return response.read()
             
             except ssl.SSLError as e:
+                # Handle SSL-related errors
                 self.logger.error(f"SSL error during API call: {e}")
                 if attempt < max_retries - 1:
                     self.logger.info("Retrying after SSL error...")
@@ -36,6 +49,7 @@ class IKApi:
                 else:
                     return None
             except http.client.HTTPException as e:
+                # Handle general HTTP errors
                 self.logger.error(f"HTTP error during API call: {e}")
                 if attempt < max_retries - 1:
                     self.logger.info("Retrying after HTTP error...")
@@ -43,10 +57,12 @@ class IKApi:
                 else:
                     return None
             except Exception as e:
+                # Catch any other unexpected errors
                 self.logger.error(f"Unexpected error during API call: {e}")
                 return None
 
     def fetch_doc(self, docid):
+        """Fetch a specific document using its document ID."""
         url = f'/doc/{docid}/'
         args = []
         if self.maxcites > 0:
@@ -57,6 +73,7 @@ class IKApi:
             url += '?' + '&'.join(args)
 
         try:
+            # Call API to fetch the document
             response = self.call_api(url)
             if not response:
                 self.logger.error(f"Failed to fetch document for docid {docid}. No response received.")
@@ -68,6 +85,7 @@ class IKApi:
 
 
     def search(self, q, pagenum, maxpages):
+        """Search documents using a query string and pagination."""
         q = urllib.parse.quote_plus(q.encode('utf8'))
         url = f'/search/?formInput={q}&pagenum={pagenum}&maxpages={maxpages}'
         try:
@@ -101,6 +119,7 @@ class IKApi:
 
         while True:
             try:
+                # Fetch search results for the current page
                 results = self.search(q, pagenum, self.maxpages)
                 if not results:
                     self.logger.warning(f"No results returned for query '{q}' on page {pagenum}.")
@@ -119,6 +138,7 @@ class IKApi:
                 self.logger.warning(f'Num results: {len(docs)}, pagenum: {pagenum}')
 
                 for doc in docs:
+                    # Stop fetching if max_docs limit is reached
                     if max_docs and len(docids) >= max_docs:
                         self.logger.info(f"Reached max_docs limit ({max_docs}) for query '{q}'.")
                         return docids
@@ -128,6 +148,7 @@ class IKApi:
                         'date': doc['publishdate'], 'court': doc['docsource']}
                     tocwriter.writerow(toc)
 
+                    # Download and save document content
                     docpath = self.storage.get_docpath(keyword_dir, doc['docsource'], doc['publishdate'])
                     if self.download_doc(docid, docpath):
                         docids.append(docid)
@@ -140,12 +161,14 @@ class IKApi:
         return docids
 
     def download_doc(self, docid, docpath):
+        """Download a document and save it to storage."""
         success = False
         orig_needed = self.orig
         jsonpath, origpath = self.storage.get_json_orig_path(docpath, docid)
 
         if not self.storage.exists(jsonpath):
             try:
+                # Fetch document JSON content
                 jsonstr = self.fetch_doc(docid)
                 if not jsonstr:
                     self.logger.error(f"No response received for docid {docid}.")
@@ -161,10 +184,12 @@ class IKApi:
                     self.logger.warning(f"Error message received for docid {docid}: {d['errmsg']}")
                     return success
 
+                # Save parsed JSON data
                 self.logger.info(f'Saved {d["title"]}')
                 self.storage.save_json(jsonstr, jsonpath)
                 success = True
 
+                # Check if original document needs to be fetched
                 if orig_needed and not d.get('courtcopy'):
                     orig_needed = False
 
@@ -174,6 +199,7 @@ class IKApi:
 
         if orig_needed and not self.storage.exists_original(origpath):
             try:
+                # Fetch original document content
                 orig = self.fetch_orig_doc(docid)
                 if orig:
                     self.logger.info(f'Saved Original {d["title"]}')
@@ -185,6 +211,7 @@ class IKApi:
 
 
     def fetch_orig_doc(self, docid):
+        """Fetch the original version of a document."""
         url = f'/origdoc/{docid}/'
         try:
             response = self.call_api(url)
