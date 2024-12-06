@@ -106,8 +106,8 @@ class PathwayVectorStore:
 
 
 if __name__ == "__main__":    # example usage
-    public_db = PathwayVectorStore('xyztest', './documents', 8765)
+    public_db = PathwayVectorStore('xyztest', './public_documents/', 8765)
     print('making a query')
-    result = public_db.get_client().as_retriever().invoke("using lorem")
+    result = public_db.get_client().as_retriever().invoke("IPC 345")
     for entry in result:
         print(entry, "\n")
