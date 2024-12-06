@@ -39,7 +39,8 @@ class KeywordExtractorAgent:
 
     async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
         """Extract relevant keywords based on the user's case and documents."""
-        documents_content = "\n".join([doc.content for doc in self.documents])
+        documents_content = "\n".join([doc for doc in self.documents])
+        # print("case files from user:",documents_content)
         prompt = f"""User Case Description:
 {user_case}
 
@@ -123,31 +124,20 @@ class FetchingAgent:
         # Initialize Indian Kanoon API client
         ikapi = IKApi(args, filestorage)
 
-        # Sample user case description
-        user_case = """
-            I am involved in a dispute with my employer over wrongful termination. They claim that I violated company policy, but I believe I was terminated due to discrimination based on my age. I have documentation of my performance reviews and emails that suggest I was meeting all job requirements.
-            """
-        # Sample relevant documents
-        documents = [
-            Document(
-                content="""Company Policy Document:
-            - All employees must adhere to the code of conduct.
-            - Equal opportunity employment is provided regardless of age, race, or gender.
-            - Termination procedures require a formal review process.
-            """
-            ),
-            Document(
-                content="""Email from Manager:
-                "Your performance has been excellent over the past year. Keep up the good work!"
-                """
-            ),
-            Document(
-                content="""Performance Review:
-                - Exceeds expectations in all areas.
-                - No violations of company policy noted.
-                """
-            ),
-        ]
+        # List to store the content of the text files uploaded by user
+        folder_path = 'private_documents'
+        documents = []
+
+        # Loop through all files in the folder
+        for filename in os.listdir(folder_path):
+            # Check if the file is a text file
+            if filename.endswith('.txt'):
+                file_path = os.path.join(folder_path, filename)
+                
+                # Read the file content
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    documents.append(content)
 
         # Extract Keywords
         agent = KeywordExtractorAgent(documents=documents, llms=self.llms)
