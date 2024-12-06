@@ -15,6 +15,7 @@ load_dotenv()
 
 def create_law_retriever(private=False) -> BaseTool:
     """Create vector store retriever for legal documents"""
+    vector_store = None
     if private:
         vector_store = PathwayVectorStore('private', './private_documents', 8765)
     else:

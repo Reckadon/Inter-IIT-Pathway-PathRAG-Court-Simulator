@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the API server
-CMD ["python", "-m", "app"]
+CMD ["python", "-m", "core.pathway_store"]
