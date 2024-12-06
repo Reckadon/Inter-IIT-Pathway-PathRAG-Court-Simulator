@@ -2,6 +2,12 @@ import asyncio
 import aiohttp
 import streamlit as st
 import json
+import os
+from pathlib import Path
+
+# Create private_documents directory if it doesn't exist
+UPLOAD_DIR = Path("private_documents")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 async def fetch_stream(user_prompt):
     url = "http://localhost:8000/stream_workflow"
@@ -15,6 +21,24 @@ async def fetch_stream(user_prompt):
                     yield line.decode("utf-8")
 
 st.title("🏛️ Courtroom Simulator")
+
+# Add file uploader before the text input
+uploaded_files = st.file_uploader(
+    "Upload case-related documents",
+    accept_multiple_files=True,
+    type=['pdf', 'txt', 'doc', 'docx']
+)
+
+# Handle file uploads
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        # Create safe filename
+        file_path = UPLOAD_DIR / uploaded_file.name
+        
+        # Save the file
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.success(f"Saved: {uploaded_file.name}")
 
 user_prompt = st.text_input("Enter your case details:", """Case File
 
