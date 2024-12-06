@@ -4,6 +4,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 from langgraph.checkpoint.memory import MemorySaver
 import os
+import json
 
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent, WebSearcherAgent
 from agents import AgentState
@@ -169,8 +170,8 @@ class TrialWorkflow:
         #             return msg.name
         return state["next"]  # Default to judge if can't determine
     
-    async def run(self, user_prompt: str) -> Dict[str, Any]:
-        """Run the trial workflow"""
+    async def run(self, user_prompt: str):
+        """Run the trial workflow as an async generator."""
         # Initialize state
         initial_state = AgentState(
             messages=[
@@ -183,24 +184,44 @@ class TrialWorkflow:
         print(f"Initial state: {initial_state}")
 
         thread = {"configurable": {"thread_id": "1"}}
-        
-        async for a in self.graph.astream(initial_state,thread):
-            print(a)
-            print("-"*100)
+
+        yield {
+            "status": "progress",
+            "state": "Initializing workflow...",
+        }
+
+        # Stream initial workflow states
+        async for state in self.graph.astream(initial_state, thread):
+            print(state)
+            print("-" * 100)
+            yield {
+                "status": "progress",
+                "content": repr(state)
+            }
 
         user_input = "argument is not strong"
 
         while True:
-            self.graph.update_state(values={"user_feedback": user_input}, as_node="user_feedback")  
+            # Update graph with user feedback
+            self.graph.update_state(values={"user_feedback": user_input}, as_node="user_feedback")
 
-            async for a in self.graph.astream(None,thread):
-                print(a)
-                print("-"*100)
+            async for state in self.graph.astream(None, thread):
+                print(state)
+                print("-" * 100)
+                yield {
+                    "status": "progress",
+                    "content": repr(state)
+                }
+                
+            # Break when the judge signals end of workflow
             try:
-                if a.judge.next == 'END':
+                if state.judge.next == 'END':
+                    yield {"status": "done", "message": "Workflow completed successfully"}
                     break
-            except:
+            except AttributeError:
+                # Handle cases where `state.judge` is not present
                 pass
+
 
         
         # Run the workflow
