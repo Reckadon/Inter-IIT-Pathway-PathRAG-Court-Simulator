@@ -5,6 +5,7 @@ from langchain_groq import ChatGroq
 import os
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse
+from langchain_huggingface import HuggingFaceEndpoint
 import json
 
 # Initialize FastAPI app
@@ -12,10 +13,13 @@ app = FastAPI()
 
 # Initialize LLMs
 llm_0 = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ["GROQ_API_KEY"])
-llms = [
-    ChatGroq(model="gemma2-9b-it", groq_api_key=os.environ["GROQ_API_KEY"]),
-    ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=os.environ["GROQ_API_KEY"]),
-    ChatGroq(model="", groq_api_key=os.environ["GROQ_API_KEY"]),
+llms =[
+    ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=os.environ['GROQ_API_KEY']),
+    ChatGroq(model="llama-3.1-8b-instant", groq_api_key=os.environ['GROQ_API_KEY']),
+    ChatGroq(model="gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY']),
+    ChatGroq(model="gemma-7b-it", groq_api_key=os.environ['GROQ_API_KEY']),
+    ChatGroq(model="mixtral-8x7b-32768", groq_api_key=os.environ['GROQ_API_KEY'])
+    # HuggingFaceEndpoint(repo_id ="Qwen/QwQ-32B-Preview", huggingfacehub_api_token=os.environ['HUGGINGFACE_API_KEY'])
 ]
 
 # Initialize Workflow

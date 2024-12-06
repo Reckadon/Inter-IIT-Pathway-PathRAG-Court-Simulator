@@ -21,9 +21,10 @@ class JudgeAgent:
         tools: Optional[List[BaseTool]] = None,
     ):
         # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
-        self.llms = llms
+        self.llms = llms # Multiple LLMs for fallback redundancy
         self.tools = tools or []
         
+        # Comprehensive system prompt defining the judge's role and responsibilities
         self.system_prompt = """
 "You are a presiding judge overseeing a courtroom simulation. Your primary role is to evaluate the arguments presented by the lawyer and prosecutor for logical consistency, factual accuracy, and adherence to legal principles."
 "Point out inconsistencies, hallucinations, or errors in the agents' arguments and provide constructive feedback to help refine them."
@@ -42,12 +43,12 @@ you will go through the following chain of thought steps:
 
 Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
 """
-        
-
-        
 
     def get_thought_steps(self) -> List[str]:
-        """Get judge-specific chain of thought steps"""
+        """
+        Returns the sequential steps in the judge's decision-making process.
+        Each step represents a specific phase of analysis and action.
+        """
         return [
             "1. Listen to the arguments presented by both the lawyer and prosecutor. Note their key points and claims. Identify potential hallucinations or logical errors or factual errors in latest argument.",
             "2. Determine the specific legal data (e.g., laws, IPCs, legal case precedents) required for cross verificaton of identified errors. Clearly ask the law retriever agent for the necessary legal data.",
@@ -57,14 +58,25 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             From previous thought step, only if trail is ready for verdict, ask for final statements from both lawyer and prosecutor., if already asked for final statements, summarize the case and deliver verdict with keyphrase "Given Verdict".
             Write the response as live dialogue (avoid bullet points), Maintain an impartial tone.""" 
         ]
-    async def process(self, state: AgentState) -> AgentState:
-        """Process current state with judge-specific logic"""
 
-       
+    async def process(self, state: AgentState) -> AgentState:
+        """
+        Process the current state and generate the next state based on judge's logic.
+        
+        Args:
+            state: Current state of the trial containing messages and thought step
+            
+        Returns:
+            Updated state with judge's response and next action
+            
+        """
+        
+        # Prepare messages for LLM processing
         messages = [
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
 
+        # Process through LLMs with fallback mechanism
         if state["thought_step"] != 4:
             for i, llm in enumerate(self.llms):
                 try:
@@ -76,6 +88,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
 
             # result = self.llm.invoke(messages)
         else:
+            # Special handling for final decision step
             for i,llm in enumerate(self.llms):
                 try:
                     result = llm.with_structured_output(JudgeDecision).invoke(messages)
@@ -86,6 +99,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             # result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
         if state["thought_step"] == 0 or state["thought_step"] == 3:
+            # Initial review or post-web search steps
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge")],
                 "next": "self",
@@ -93,6 +107,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
                 "caller": "judge"
             }
         elif state["thought_step"] == 1:
+            # Legal data retrieval step
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge") ],
                 "next": "retriever",
@@ -100,6 +115,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
                 "caller": "judge"
             }
         elif state["thought_step"] == 2:
+            # Web search decision step
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge") ],
                 "next": self.is_web_search_needed(result.content),
@@ -107,6 +123,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
                 "caller": "judge"
             }
         elif state["thought_step"] == 4:
+            # Final decision step
             response = {
                 "messages": [HumanMessage(content=result.response, name="judge")],
                 "next": result.next_agent,
@@ -119,6 +136,10 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         return response
     
     def is_web_search_needed(self, content: str) -> Literal["self", "web_searcher"]:
+        """
+        Determines if web search is needed based on the content.
+        Returns 'self' if no search needed, 'web_searcher' otherwise.
+        """
         if "none" in content.lower():
             return "self"
         else:

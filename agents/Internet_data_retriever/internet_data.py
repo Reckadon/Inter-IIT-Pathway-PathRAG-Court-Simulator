@@ -5,7 +5,6 @@ from .agents import DataRetrieverAgents
 from .tasks import RetrievalTasks
 
 from dotenv import load_dotenv
-# load_dotenv()
 
 # Debug prints
 print("Loading environment variables...")
@@ -48,25 +47,6 @@ class DataRetrievalCrew:
 
         result = crew1.kickoff_async()
         return result
-
-        # if 'yes' in str(result).lower()[:10]:
-        #     return formulate_counterargument_task.output
-        
-        # else:
-
-        #     request_additional_info_task = tasks.request_additional_information(legal_assistant, argument, formulate_counterargument_task.output)
-        #     refine_counterargument_task = tasks.refine_counterargument(legal_assistant, argument, formulate_counterargument_task.output)
-
-        #     crew2 = Crew(
-        #     agents=[legal_assistant],
-        #     tasks=[request_additional_info_task, refine_counterargument_task],
-        #     process=Process.sequential,
-        #     # task_routing=routing
-        #     )
-
-        #     result = crew2.kickoff()
-        #     return result
-
 
 # This is the main function that you will use to run your custom crew.
 if __name__ == "__main__":

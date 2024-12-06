@@ -65,22 +65,6 @@ class RetrievalTasks:
                  website links which were used to formulate the counterargument.
             '''))
 
-    # def evaluate_counterargument(self, agent, argument):
-    #     return Task(description=dedent(f'''
-    #     **Task**: Evaluate Counterargument  
-    #     **Description**: Assess the validity of the counterargument provided by the Legal Researcher. Check if it is comprehensive 
-    #                      and aligned with the original argument's context. Decide if the argument to be countered is directed towards the client/user 
-    #                      or needs to know personal information from the user. If user-specific information is needed then the argument is not valid.
-    #                      If the counterargument is valid, approve it else disapprove it.
-    #                      Your final output must be a SINGLE word which is "YES" if counterargument is valid and "NO" if it is not valid.  
-
-    #     **Parameters**:  
-    #     - Argument to be countered: {argument}
-
-    #     **Note**: {self.__tip_section()}
-    #     '''),
-    #     agent=agent,
-    #     expected_output=dedent('''return a SINGLE word as output. It should be "YES" if counterargument is valid and "NO" if it is not valid.'''))
 
     def evaluate_counterargument(self, agent, argument):
         return Task(description=dedent(f'''
@@ -148,19 +132,3 @@ class RetrievalTasks:
 
 
 
-###TASK TEMPLATE###
-
-    # def task_name(self, agent):
-    #     return Task(
-    #         description=dedent(
-    #             f"""
-    #         Take the input from task 1 and do something with it.
-                                       
-    #         {self.__tip_section()}
-
-    #         Make sure to do something else.
-    #     """
-    #         ),
-    #         expected_output="The expected output of the task",
-    #         agent=agent,
-    #     )
