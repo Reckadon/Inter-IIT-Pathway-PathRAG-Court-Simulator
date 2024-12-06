@@ -18,7 +18,7 @@ def create_law_retriever(private=False) -> BaseTool:
     if private:
         vector_store = PathwayVectorStore('private', './private_documents', 8765)
     else:
-        vector_store = PathwayVectorStore('public', './public_documents', 8700)
+        vector_store = PathwayVectorStore('public', './public_documents', 8766)
 
     client = vector_store.get_client()
     

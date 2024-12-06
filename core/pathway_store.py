@@ -13,6 +13,13 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # def strip_metadata(docs: list[tuple[str, dict]]) -> list[str]:
 #     return [doc[0] for doc in docs]
 
+parser = OpenParse(table_args=None, image_args=None, parse_images = False)
+
+embeddings_model = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+    # model_name = "law-ai/InLegalBERT"
+)
+
 class PathwayVectorStore:
     def __init__(self, name, path, port):
         """
@@ -37,21 +44,16 @@ class PathwayVectorStore:
                 with_metadata=True,
             )
 
-            parser = OpenParse(table_args=None, image_args=None, parse_images = False)
             # Apply the parser to the PDF data
             # self.documents = self.data_sources.select(data=parser(pw.this.data))
 
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=10)
-
-            embeddings_model = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-                # model_name = "law-ai/InLegalBERT"
-            )
+            # no splitter needed as OpenParse handles it
+            # text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=10)   
 
             print(f"\nmaking VectorStore: '{self.name}'... with docs {self.data_sources}\n")
             self.vector_server = VectorStoreServer.from_langchain_components(
                 self.data_sources,
-                parser=parser,
+                parser= parser,
                 splitter=None,
                 embedder=embeddings_model,
             )
@@ -72,7 +74,6 @@ class PathwayVectorStore:
                 port=port,
             )   
             print("\n made client..")
-
 
 
         except Exception as e:
