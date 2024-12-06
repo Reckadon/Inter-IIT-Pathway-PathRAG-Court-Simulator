@@ -26,8 +26,8 @@ class TrialWorkflow:
         self.retriever = retriever # or RetrieverAgent(docs=docs)
         self.kanoon_fetcher = kanoon_fetcher
         self.web_searcher = web_searcher
-        self.graph = self._create_graph()
         self.memory = MemorySaver()
+        self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
         """Create the trial workflow graph"""
@@ -46,7 +46,7 @@ class TrialWorkflow:
         # Start with judge
         workflow.add_edge(START, "kanoon_fetcher")
         workflow.add_edge("kanoon_fetcher", "prosecutor")
-        workflow.add_edge("user_feedback", "Lawyer")
+        workflow.add_edge("user_feedback", "lawyer")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -181,8 +181,10 @@ class TrialWorkflow:
         )
 
         print(f"Initial state: {initial_state}")
+
+        thread = {"configurable": {"thread_id": "1"}}
         
-        async for a in self.graph.astream(initial_state):
+        async for a in self.graph.astream(initial_state,thread):
             print(a)
             print("-"*100)
 
@@ -191,7 +193,7 @@ class TrialWorkflow:
         while True:
             self.graph.update_state(values={"user_feedback": user_input}, as_node="user_feedback")  
 
-            async for a in self.graph.astream(None):
+            async for a in self.graph.astream(None,thread):
                 print(a)
                 print("-"*100)
             try:
