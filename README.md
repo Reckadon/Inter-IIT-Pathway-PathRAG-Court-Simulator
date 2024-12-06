@@ -32,7 +32,7 @@ Then, run the container with the following command:
 docker run -it -p 8000:8000 --rm --env-file .env pathwaytest
 ```
 
-_Use the same name as above_, frontend running at port 8000
+_Use the same name as above_, this will expose the backend FastAPI server at port 8000.
 
 ---
 
