@@ -33,6 +33,7 @@ class KeywordExtractorAgent:
             - Focus on legal terms, case identifiers, statutory references, key legal concepts, and any unique aspects of the case.
             - Consider synonyms and related terms that might be used in legal databases.
             - Do not include irrelevant information or overly general terms.
+            - Give only top 5 most relevant keywords.
             """
         }
     async def extract_keywords(self, user_case: str) -> Dict[str, Any]:
