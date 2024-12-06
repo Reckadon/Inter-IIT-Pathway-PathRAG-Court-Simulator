@@ -5,7 +5,7 @@ from .base import AgentState
 from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 import argparse
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from dotenv import load_dotenv
 
 # Class to handle keyword extraction from legal documents
