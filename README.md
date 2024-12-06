@@ -29,10 +29,10 @@ docker build -t pathwaytest .
 Then, run the container with the following command:
 
 ```terminal
-docker run -it --rm --env-file .env pathwaytest
+docker run -it -p 8000:8000 --rm --env-file .env pathwaytest
 ```
 
-_Use the same name as above_
+_Use the same name as above_, frontend running at port 8000
 
 ---
 
