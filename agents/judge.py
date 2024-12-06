@@ -25,11 +25,12 @@ class JudgeAgent:
     
     def __init__(
         self,  
-        llm: Optional[BaseChatModel] = None,
+        llms,
         tools: Optional[List[BaseTool]] = None,
-        **kwargs
+        # **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.llms = llms
         self.tools = tools or []
         
         self.system_prompt = """
@@ -80,9 +81,24 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
 
         # print(f"prompt: {messages}")
         if state["thought_step"] != 4:
-            result = self.llm.invoke(messages)
+            for i, llm in enumerate(self.llms):
+                try:
+                    result = llm.invoke(messages)
+                    break
+                except Exception as e:
+                    print(f"LLM {i} failed with error: {e}")
+                    continue
+
+            # result = self.llm.invoke(messages)
         else:
-            result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
+            for i,llm in enumerate(self.llms):
+                try:
+                    result = llm.with_structured_output(JudgeDecision).invoke(messages)
+                    break
+                except Exception as e:
+                    print(f"LLM {i} failed with error: {e}")
+                    continue
+            # result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
         if state["thought_step"] == 0 or state["thought_step"] == 3:
             response = {

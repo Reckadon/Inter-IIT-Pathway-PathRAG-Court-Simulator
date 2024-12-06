@@ -10,11 +10,11 @@
 - First, go into the project directory, and setup a `.env` file (have to make the file) containing all the __API Keys__ required to run the LLMs and fetching tools.:
 
 ```env
-GOOGLE_API_KEY = your_key_here
-GROQ_API_KEY = your_key_here
-HUGGINGFACE_API_KEY = your_key_here
-SERPER_API_KEY = your_key_here
-KANOON_API_KEY = your_key_here
+GOOGLE_API_KEY= <your_key_here>
+GROQ_API_KEY= <your_key_here>
+HUGGINGFACE_API_KEY= <your_key_here>
+SERPER_API_KEY= <your_key_here>
+KANOON_API_KEY= <your_key_here>
 // Other API keys for any LLM you would like to use
 ```
 - Then, run the following command:

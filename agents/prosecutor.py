@@ -26,11 +26,12 @@ class ProsecutorAgent:
     
     def __init__(
         self,
-        llm: Optional[BaseChatModel] = None,
+        llms,
         tools: Optional[List[BaseTool]] = None,
         **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+        # self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+        self.llms = llms 
         self.tools = tools or []
         
         self.system_prompt = """
@@ -65,7 +66,16 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
 
-        result = self.llm.invoke(messages)
+        # used different llm if an llm fails    
+        for i,llm in enumerate(self.llms):
+            try:
+                result = llm.invoke(messages)
+                break
+            except Exception as e:
+                print(f"LLM {i} failed with error: {e}")
+                continue
+    
+        # result = self.llm.invoke(messages)
         
         if state["thought_step"] == 0:
             response = {
