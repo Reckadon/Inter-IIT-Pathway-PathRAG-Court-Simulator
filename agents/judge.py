@@ -5,12 +5,12 @@ from pydantic import BaseModel, Field
 from agents.base import AgentState
 
 
-class JudgeDecision(BaseModel):
-    """Judge's structured decision output"""
-    response: str = Field(description="The judge's response and comments")
-    next_agent: Literal["lawyer", "prosecutor", "END"] = Field(
-        description="Next agent to speak in the trial or END if verdict is given in response"
-    )
+# class JudgeDecision(BaseModel):
+#     """Judge's structured decision output"""
+#     response: str = Field(description="The judge's response and comments")
+#     next_agent: Literal["lawyer", "prosecutor", "END"] = Field(
+#         description="Next agent to speak in the trial or END if verdict is given in response"
+#     )
 
 class JudgeAgent:
     """Agent representing the judge who manages the trial flow"""
@@ -40,6 +40,7 @@ you will go through the following chain of thought steps:
 3. web search
 4. check if trial is ready for verdict
 5. give response based on above steps
+6. determine next speaker
 
 Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
 """
@@ -53,10 +54,11 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             "1. Listen to the arguments presented by both the lawyer and prosecutor. Note their key points and claims. Identify potential hallucinations or logical errors or factual errors in latest argument.",
             "2. Determine the specific legal data (e.g., laws, IPCs, legal case precedents) required for cross verificaton of identified errors. Clearly ask the law retriever agent for the necessary legal data.",
             "3. Evaluate if additional web-based information is needed. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
-            "4. Assess the current state of the case, analyze and determine if it is ready for a verdict. Atleast 10 arguments should be present before verdict.",
+            "4. Assess the current state of the case, only analyze if it is ready for a verdict DO NOT give verdict yet. Atleast 10 arguments should be present before verdict.",
             """5. Provide constructive feedback or comments, pointing out logical flaws, factual inconsistencies, or unsupported claims in the arguments if present based on retrieverd data. 
             From previous thought step, only if trail is ready for verdict, ask for final statements from both lawyer and prosecutor., if already asked for final statements, summarize the case and deliver verdict with keyphrase "Given Verdict".
-            Write the response as live dialogue (avoid bullet points), Maintain an impartial tone.""" 
+            Write the response as live dialogue (avoid bullet points), Maintain an impartial tone.""",
+            "6.Determine next speaker, respond with only one of the keywords 'lawyer' or 'prosecutor' or 'END' if verdict is given in previous response" 
         ]
 
     async def process(self, state: AgentState) -> AgentState:
@@ -77,28 +79,28 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         ] + state["messages"]
 
         # Process through LLMs with fallback mechanism
-        if state["thought_step"] != 4:
-            for i, llm in enumerate(self.llms):
-                try:
-                    result = llm.invoke(messages)
-                    break
-                except Exception as e:
-                    print(f"LLM {i} failed with error: {e}")
-                    continue
+        # if state["thought_step"] != 4:
+        for i, llm in enumerate(self.llms):
+            try:
+                result = llm.invoke(messages)
+                break
+            except Exception as e:
+                print(f"LLM {i} failed with error: {e}")
+                continue
 
-            # result = self.llm.invoke(messages)
-        else:
-            # Special handling for final decision step
-            for i,llm in enumerate(self.llms):
-                try:
-                    result = llm.with_structured_output(JudgeDecision).invoke(messages)
-                    break
-                except Exception as e:
-                    print(f"LLM {i} failed with error: {e}")
-                    continue
+        #     # result = self.llm.invoke(messages)
+        # else:
+        #     # Special handling for final decision step
+        #     for i,llm in enumerate(self.llms):
+        #         try:
+        #             result = llm.with_structured_output(JudgeDecision).invoke(messages)
+        #             break
+        #         except Exception as e:
+        #             print(f"LLM {i} failed with error: {e}")
+        #             continue
             # result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
-        if state["thought_step"] == 0 or state["thought_step"] == 3:
+        if state["thought_step"] == 0 or state["thought_step"] == 3 or state["thought_step"] == 4:
             # Initial review or post-web search steps
             response = {
                 "messages": [HumanMessage(content=result.content, name="judge")],
@@ -122,11 +124,11 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
                 "thought_step": 3,
                 "caller": "judge"
             }
-        elif state["thought_step"] == 4:
+        elif state["thought_step"] == 5:
             # Final decision step
             response = {
-                "messages": [HumanMessage(content=result.response, name="judge")],
-                "next": result.next_agent,
+                "messages": [HumanMessage(content=f"next speaker: {result.content}", name="judge")],
+                "next": self.next_speaker(result.content),
                 "thought_step": 0,
                 "caller": "judge"
             }
@@ -144,4 +146,15 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             return "self"
         else:
             return "web_searcher"
+        
+    def next_speaker(self, content: str) -> Literal["lawyer", "prosecutor", "END"]:
+        """
+        Determines the next speaker based on the content.
+        """
+        if "lawyer" in content.lower():
+            return "lawyer"
+        elif "END" in content.lower():
+            return "END"
+        else:
+            return "prosecutor"
    
