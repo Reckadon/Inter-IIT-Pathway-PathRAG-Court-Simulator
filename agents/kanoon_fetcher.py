@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Dict, Any, List, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from .base import AgentState
@@ -6,6 +7,7 @@ from .misc.filestorage import FileStorage
 from .misc.ik import IKApi
 import argparse
 import json
+import shutil
 from dotenv import load_dotenv
 
 # Class to handle keyword extraction from legal documents
@@ -24,7 +26,7 @@ class KeywordExtractorAgent:
 
             1. Understand the user's legal case based on the provided description.
             2. Analyze the provided documents related to the case.
-            3. Identify and extract keywords, phrases, and legal terms that are most relevant to the user's case.
+            3. Identify and extract only 5 most relevant keywords, phrases, and legal terms that are most relevant to the user's case.
             4. Provide the user with a list of these keywords to help them search for supportive cases and information on law websites.
             5. Ensure that the keywords are specific, relevant, and cover all aspects of the user's case.
 
@@ -164,7 +166,7 @@ class FetchingAgent:
         # Path to the 'public' directory
         base_path = "public_documents"
 
-        # Loop through all unique subfolders in the base directory
+        # Loop through all unique subfolders, created by the storage utility, in the base directory
         for unique_folder in os.listdir(base_path):
             unique_folder_path = os.path.join(base_path, unique_folder)
             
@@ -218,4 +220,13 @@ class FetchingAgent:
                 with open(output_file_path, "w", encoding="utf-8") as output_file:
                     output_file.write("\n\n".join(combined_text))
                 print(f"Created combined text file: {output_file_path}")
+
+                # Delete the unique folder after successful processing
+                try:
+                    shutil.rmtree(unique_folder_path)
+                    print(f"Deleted folder: {unique_folder_path}")
+                except Exception as e:
+                    print(f"Error deleting folder {unique_folder_path}: {e}")
+
+        time.sleep(10)
 
