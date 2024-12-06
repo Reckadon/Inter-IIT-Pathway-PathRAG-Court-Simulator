@@ -2,10 +2,11 @@ from typing import Dict, Any, List, Optional, TypedDict, Literal
 from langgraph.graph import StateGraph, START,  END
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
+from langgraph.checkpoint.memory import MemorySaver
 import os
 
 from agents import LawyerAgent, ProsecutorAgent, JudgeAgent, RetrieverAgent, FetchingAgent, WebSearcherAgent
-from .state import AgentState
+from agents import AgentState
 
 class TrialWorkflow:
     """Manages the trial workflow using LangGraph"""
@@ -25,6 +26,7 @@ class TrialWorkflow:
         self.retriever = retriever # or RetrieverAgent(docs=docs)
         self.kanoon_fetcher = kanoon_fetcher
         self.web_searcher = web_searcher
+        self.memory = MemorySaver()
         self.graph = self._create_graph()
     
     def _create_graph(self) -> StateGraph:
@@ -39,10 +41,12 @@ class TrialWorkflow:
         workflow.add_node("prosecutor", self._prosecutor_node)
         workflow.add_node("retriever", self._retriever_node)
         workflow.add_node("web_searcher", self._web_search_node)
+        workflow.add_node("user_feedback", self._user_feedback_node)
         
         # Start with judge
         workflow.add_edge(START, "kanoon_fetcher")
         workflow.add_edge("kanoon_fetcher", "prosecutor")
+        workflow.add_edge("user_feedback", "lawyer")
         
         # Judge manages the flow
         workflow.add_conditional_edges(
@@ -66,6 +70,7 @@ class TrialWorkflow:
                 "judge": "judge",
                 "retriever": "retriever",
                 "web_searcher": "web_searcher",
+                "user_feedback": "user_feedback",
                 "self": "lawyer"  # For Chain of Thought
             }
         )
@@ -104,7 +109,7 @@ class TrialWorkflow:
             }
         )
         
-        return workflow.compile()
+        return workflow.compile(checkpointer=self.memory, interrupt_before=["user_feedback"])
     
     async def _kanoon_fetcher_node(self, state: AgentState) -> AgentState:
         """Kanoon Fetcher node processing"""
@@ -134,6 +139,11 @@ class TrialWorkflow:
         """Web Search node processing"""
         # print(f"Web Search node processing with state: {state}")
         return await self.web_searcher.process(state)
+    
+    async def _user_feedback_node(self, state: AgentState) -> AgentState:
+        """User feedback node processing"""
+        # print(f"User feedback node processing with state: {state}")
+        pass
     
     def _route_from_judge(self, state: AgentState) -> str:
         """Route based on judge's decision"""
@@ -171,10 +181,26 @@ class TrialWorkflow:
         )
 
         print(f"Initial state: {initial_state}")
+
+        thread = {"configurable": {"thread_id": "1"}}
         
-        async for a in self.graph.astream(initial_state):
+        async for a in self.graph.astream(initial_state,thread):
             print(a)
             print("-"*100)
+
+        user_input = "argument is not strong"
+
+        while True:
+            self.graph.update_state(values={"user_feedback": user_input}, as_node="user_feedback")  
+
+            async for a in self.graph.astream(None,thread):
+                print(a)
+                print("-"*100)
+            try:
+                if a.judge.next == 'END':
+                    break
+            except:
+                pass
 
         
         # Run the workflow

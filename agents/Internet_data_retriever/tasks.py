@@ -1,7 +1,6 @@
 from crewai import Task
 from textwrap import dedent
 from .tools.search_tool import SearchTools
-from .tools.askUser_tool import AskUserTools
 
 class RetrievalTasks:
     def __tip_section(self):

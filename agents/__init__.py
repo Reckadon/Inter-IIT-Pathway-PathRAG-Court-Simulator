@@ -1,5 +1,5 @@
 """Agent implementations for the Legal RAG system"""
-# from .base import BaseAgent
+from .base import AgentState
 from .lawyer import LawyerAgent
 from .prosecutor import ProsecutorAgent
 from .judge import JudgeAgent
@@ -8,7 +8,7 @@ from .kanoon_fetcher import FetchingAgent
 from .web_search import WebSearcherAgent
 
 __all__ = [
-    # 'BaseAgent',
+    'AgentState',
     'LawyerAgent',
     'ProsecutorAgent',
     'JudgeAgent',

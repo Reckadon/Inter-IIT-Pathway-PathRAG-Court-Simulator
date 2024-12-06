@@ -1,17 +1,9 @@
 from typing import Dict, Any, List, Optional, Literal, TypedDict
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from agents.base import AgentState
-from langchain_groq import ChatGroq
-import getpass
-import os
 
-# os.environ["GROQ_API_KEY"] = getpass.getpass()
-from dotenv import load_dotenv
-load_dotenv()
 
 class JudgeDecision(BaseModel):
     """Judge's structured decision output"""
@@ -25,11 +17,11 @@ class JudgeAgent:
     
     def __init__(
         self,  
-        llm: Optional[BaseChatModel] = None,
+        llms,
         tools: Optional[List[BaseTool]] = None,
-        **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.llms = llms
         self.tools = tools or []
         
         self.system_prompt = """
@@ -69,20 +61,29 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         """Process current state with judge-specific logic"""
 
        
-        # if state["thought_step"] >= 0:
         messages = [
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
-        # else:
-        #     messages = [
-        #         {"role": "system", "content": self.system_prompt + "\n'current_task': 'Start of trial, choose the first speaker'"}
-        #     ] + state["messages"]
 
-        # print(f"prompt: {messages}")
         if state["thought_step"] != 4:
-            result = self.llm.invoke(messages)
+            for i, llm in enumerate(self.llms):
+                try:
+                    result = llm.invoke(messages)
+                    break
+                except Exception as e:
+                    print(f"LLM {i} failed with error: {e}")
+                    continue
+
+            # result = self.llm.invoke(messages)
         else:
-            result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
+            for i,llm in enumerate(self.llms):
+                try:
+                    result = llm.with_structured_output(JudgeDecision).invoke(messages)
+                    break
+                except Exception as e:
+                    print(f"LLM {i} failed with error: {e}")
+                    continue
+            # result = self.llm.with_structured_output(JudgeDecision).invoke(messages)
         
         if state["thought_step"] == 0 or state["thought_step"] == 3:
             response = {
@@ -122,52 +123,4 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             return "self"
         else:
             return "web_searcher"
-    
-    # def _parse_judge_decision(self, content: str) -> JudgeDecision:
-    #     """Parse judge's decision from response content"""
-    #     # Default decision structure
-    #     decision: JudgeDecision = {
-    #         "next_agent": "lawyer",  # Default to lawyer if unclear
-    #         "reasoning": "",
-    #         "fact_check": None
-    #     }
-        
-    #     content_lower = content.lower()
-        
-    #     # Check for fact-check indicators
-    #     if any(term in content_lower for term in ["fact check", "verify", "accuracy"]):
-    #         decision["fact_check"] = {
-    #             "validity": self._assess_validity(content),
-    #             "feedback": content
-    #         }
-        
-    #     # Check for verdict readiness
-    #     if any(term in content_lower for term in ["conclude", "verdict", "decision", "ruling"]):
-    #         decision["next_agent"] = "END"
-    #         decision["reasoning"] = "Trial ready for verdict"
-    #         return decision
-        
-    #     # Check for retriever need
-    #     if any(term in content_lower for term in ["need information", "more evidence", "research"]):
-    #         decision["next_agent"] = "retriever"
-    #         decision["reasoning"] = "Additional information required"
-    #         return decision
-        
-    #     # Determine next speaker
-    #     if "prosecutor" in content_lower:
-    #         decision["next_agent"] = "prosecutor"
-    #     elif "lawyer" in content_lower:
-    #         decision["next_agent"] = "lawyer"
-            
-    #     decision["reasoning"] = content
-    #     return decision
-    
-    # def _assess_validity(self, content: str) -> float:
-    #     """Assess validity score from content"""
-    #     if "invalid" in content.lower():
-    #         return 0.0
-    #     elif "partially valid" in content.lower():
-    #         return 0.5
-    #     elif "valid" in content.lower():
-    #         return 1.0
-    #     return 0.5  # Default to partial validity if unclear
+   

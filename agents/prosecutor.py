@@ -14,23 +14,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# class ProsecutorResponse(BaseModel):
-#     """Structured prosecutor response"""
-#     response: str = Field(description="The prosecutor's argument or response")
-#     next_agent: Literal["self", "judge", "retriever"] = Field(
-#         description="Next step in the legal process"
-#     )
-
 class ProsecutorAgent:
     """Agent representing the prosecution"""
     
     def __init__(
         self,
-        llm: Optional[BaseChatModel] = None,
+        llms,
         tools: Optional[List[BaseTool]] = None,
-        **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+        # self.llm = llm or ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+        self.llms = llms 
         self.tools = tools or []
         
         self.system_prompt = """
@@ -65,7 +58,15 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
 
-        result = self.llm.invoke(messages)
+        for i,llm in enumerate(self.llms):
+            try:
+                result = llm.invoke(messages)
+                break
+            except Exception as e:
+                print(f"LLM {i} failed with error: {e}")
+                continue
+    
+        # result = self.llm.invoke(messages)
         
         if state["thought_step"] == 0:
             response = {
@@ -106,94 +107,4 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         else:
             return "web_searcher"
 
-    # def _determine_next_agent(self, result: Dict[str, Any]) -> str:
-    #     """Determine next agent based on prosecution needs"""
-    #     prosecution_arg = self._structure_prosecution(result["messages"][-1].content)
-    #     return "retriever" if prosecution_arg["needs_information"] else "judge"
-    
-    # def _structure_prosecution(self, content: str) -> ProsecutionArgument:
-    #     """Parse and structure the prosecution argument"""
-    #     # Default prosecution structure
-    #     prosecution: ProsecutionArgument = {
-    #         "argument": content,
-    #         "evidence_cited": [],
-    #         "legal_basis": [],
-    #         "needs_information": False,
-    #         "information_request": None,
-    #         "strength_assessment": 0.5
-    #     }
-        
-    #     content_lower = content.lower()
-        
-    #     # Extract evidence citations
-    #     evidence_markers = ["evidence shows", "as proven by", "exhibits demonstrate", "witness testimony"]
-    #     for marker in evidence_markers:
-    #         if marker in content_lower:
-    #             start_idx = content_lower.index(marker)
-    #             end_idx = content.find(".", start_idx)
-    #             if end_idx != -1:
-    #                 evidence = content[start_idx:end_idx].strip()
-    #                 prosecution["evidence_cited"].append(evidence)
-        
-    #     # Extract legal basis
-    #     legal_markers = ["pursuant to", "under section", "statute requires", "law states"]
-    #     for marker in legal_markers:
-    #         if marker in content_lower:
-    #             start_idx = content_lower.index(marker)
-    #             end_idx = content.find(".", start_idx)
-    #             if end_idx != -1:
-    #                 legal_ref = content[start_idx:end_idx].strip()
-    #                 prosecution["legal_basis"].append(legal_ref)
-        
-    #     # Check for information needs
-    #     info_markers = ["require additional evidence", "need investigation", "further proof needed"]
-    #     if any(marker in content_lower for marker in info_markers):
-    #         prosecution["needs_information"] = True
-    #         for marker in info_markers:
-    #             if marker in content_lower:
-    #                 start_idx = content_lower.index(marker)
-    #                 end_idx = content.find(".", start_idx)
-    #                 if end_idx != -1:
-    #                     prosecution["information_request"] = content[start_idx:end_idx].strip()
-    #                     break
-        
-    #     # Assess argument strength
-    #     strength_markers = {
-    #         "conclusively proves": 0.9,
-    #         "strongly demonstrates": 0.8,
-    #         "indicates": 0.6,
-    #         "suggests": 0.5,
-    #         "may show": 0.3
-    #     }
-    #     for marker, strength in strength_markers.items():
-    #         if marker in content_lower:
-    #             prosecution["strength_assessment"] = strength
-    #             break
-        
-    #     return prosecution
-    
-    # def _format_prosecution(self, prosecution: ProsecutionArgument) -> str:
-    #     """Format structured prosecution argument"""
-    #     formatted = []
-        
-    #     # Main argument
-    #     formatted.append(prosecution["argument"])
-        
-    #     # Legal basis
-    #     if prosecution["legal_basis"]:
-    #         formatted.append("\nLegal Basis:")
-    #         for basis in prosecution["legal_basis"]:
-    #             formatted.append(f"- {basis}")
-        
-    #     # Evidence citations
-    #     if prosecution["evidence_cited"]:
-    #         formatted.append("\nEvidence:")
-    #         for evidence in prosecution["evidence_cited"]:
-    #             formatted.append(f"- {evidence}")
-        
-    #     # Strength assessment
-    #     strength_level = "Strong" if prosecution["strength_assessment"] > 0.7 else \
-    #                     "Moderate" if prosecution["strength_assessment"] > 0.4 else "Weak"
-    #     formatted.append(f"\nArgument Strength: {strength_level}")
-        
-    #     return "\n".join(formatted)
+   

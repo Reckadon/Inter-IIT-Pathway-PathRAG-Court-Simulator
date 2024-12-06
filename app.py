@@ -5,23 +5,31 @@ import asyncio
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
+# def initialize_llm():
+#     try:
+#         llm = ChatGroq(model="gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY'])
+#     except:
+#         llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
+#     return llm
+# def initialize_llm_1():
+#     try:    
+#         llm = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY'])
+#     except:
+#         llm = ChatGoogleGenerativeAI(model="google/gemini-1.5-flash", api_key=os.getenv('GOOGLE_API_KEY'))
+#     return llm
 
-llm = ChatGroq(model="llama-3.1-70b-versatile", api_key=os.getenv('GROQ_API_KEY'))
-# llm = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY'])
-# llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", api_key=os.getenv('GOOGLE_API_KEY'))
 
 if __name__ == "__main__":
     print("running the app.py file...\n")
-    # main()
-    # docs = "/documents"
-
+    llm_0 = ChatGroq(model="groq/gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY'])
+    llms =[ChatGroq(model="gemma2-9b-it", groq_api_key=os.environ['GROQ_API_KEY']),ChatGroq(model="llama-3.1-70b-versatile", groq_api_key=os.environ['GROQ_API_KEY']),ChatGroq(model="", groq_api_key=os.environ['GROQ_API_KEY'])]
     workflow = TrialWorkflow(
-        lawyer=LawyerAgent(llm=llm),
-        prosecutor=ProsecutorAgent(llm=llm),
-        judge=JudgeAgent(llm=llm),
-        retriever=RetrieverAgent(llm=llm),
-        kanoon_fetcher = FetchingAgent(llm=llm),
-        web_searcher = WebSearcherAgent(llm=llm)
+        lawyer=LawyerAgent(llms=llms),
+        prosecutor=ProsecutorAgent(llms=llms),
+        judge=JudgeAgent(llms=llms),
+        retriever=RetrieverAgent(llms=llms),
+        kanoon_fetcher = FetchingAgent(llms=llms),
+        web_searcher = WebSearcherAgent(llm=llm_0)
     )
 
     workflow.visualize()

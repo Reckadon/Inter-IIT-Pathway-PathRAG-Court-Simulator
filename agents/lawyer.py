@@ -1,34 +1,21 @@
 from typing import Dict, Any, List, Optional, Literal, TypedDict
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 from langchain.tools import BaseTool
 from .base import AgentState
-from pydantic import BaseModel, Field
-from langchain_groq import ChatGroq
-import os
-
-from dotenv import load_dotenv
-load_dotenv()
 
 
-# class LawyerResponse(BaseModel):
-#     """Structured lawyer response"""
-#     response: str = Field(description="The lawyer's argument or response")
-#     next_agent: Literal["self", "judge", "retriever"] = Field(
-#         description="Next step in the legal process"
-#     )
 
 class LawyerAgent:
     """Agent representing the defense counsel"""
     
     def __init__(
         self,
-        llm: Optional[BaseChatModel] = None,
+        llms,
         tools: Optional[List[BaseTool]] = None,
-        **kwargs
+        # **kwargs
     ):
-        self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        # self.llm = llm or ChatGroq(model="llama3-8b-8192", api_key=os.getenv('GROQ_API_KEY'))
+        self.llms = llms
         self.tools = tools or []
         
         self.system_prompt = """
@@ -43,6 +30,8 @@ you will go through the following chain of thought steps:
 2. Identify the legal information needed to support the argument
 3. Assess if information from the web is required
 4. Argument construction
+    <user input>
+5. Argument refinement based on feedback
 
 Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
 """
@@ -53,7 +42,9 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             "1. Go through the case files and current state of the courtroom. Plan a strategy to make a strong argument in favor of the user.",
             "2. Identify the specific information needed to support the argument (e.g., laws, IPCs, precedents). Clearly ask the law retriever agent for this information.",
             "3. Assess if additional information from the web is required. If yes, ask the web searcher agent with specific details. If not, reply only with the keyword 'none.'",
-            "4. Construct a coherent and persuasive argument based on data received and the planned strategy. Write the response as live dialogue (avoid bullet points), and ensure it is fact-based and free from hallucinations."
+            "4. Construct a coherent and persuasive argument based on data received and the planned strategy. Write the response as live dialogue (avoid bullet points), and ensure it is fact-based and free from hallucinations.",
+            "5. Refine your argument based on feedback from the user input. if any new points include them to the argument carefully. Correct any inconsistencies or errors pointed out and strengthen your position."
+
         ]
 
     async def process(self, state: AgentState) -> AgentState:
@@ -63,8 +54,15 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
         ] + state["messages"]
 
+        for i,llm in enumerate(self.llms):
+            try:
+                result = llm.invoke(messages)
+                break
+            except Exception as e:
+                print(f"LLM {i} failed with error: {e}")
+                continue
 
-        result = self.llm.invoke(messages)
+        # result = self.llm.invoke(messages)
         
         if state["thought_step"] == 0:
             response = {
@@ -88,6 +86,13 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
                 "caller": "lawyer"
             }
         elif state["thought_step"] == 3:
+            response = {
+                "messages": [HumanMessage(content=result.content, name="lawyer")],
+                "next": "user_feedback",
+                "thought_step": 4,
+                "caller": "lawyer"
+            }
+        elif state["thought_step"] == 4:
             response = {
                 "messages": [HumanMessage(content=result.content, name="lawyer")],
                 "next": "judge",

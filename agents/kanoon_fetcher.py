@@ -10,15 +10,14 @@ from dotenv import load_dotenv
 class KeywordExtractorAgent:
     def __init__(self,
         documents: List[Any],
-        llm
+        llms
     ):
         self.documents = documents
-        self.llm = llm or ChatGoogleGenerativeAI(
-            model="gemini-pro",
-            temperature=0,
-            convert_system_message_to_human=True
-        )
-
+        # self.llm = llm or ChatGoogleGenerativeAI(
+        #     model="gemini-1.5-flash",
+        #     temperature=0
+        # )
+        self.llms = llms
         # Define the system prompt for the task
         self.system_prompt = {
             "role": "system",
@@ -57,10 +56,20 @@ Provide the list of keywords in bullet point format.
 
     def _get_llm_response(self, prompt: str) -> str:
         """Get response from the Gemini-pro LLM."""
-        response = self.llm.invoke([
-            {"role": "system", "content": self.system_prompt['content']},
-            {"role": "user", "content": prompt}
-        ])
+        # response = self.llm.invoke([
+        #     {"role": "system", "content": self.system_prompt['content']},
+        #     {"role": "user", "content": prompt}
+        # ])
+        for i,llm in enumerate(self.llms):
+            try:
+                response = llm.invoke([
+                    {"role": "system", "content": self.system_prompt['content']},
+                    {"role": "user", "content": prompt}
+                ])
+                break
+            except Exception as e:
+                print(f"LLM {i} failed with error: {e}")
+                continue
         return response.content
 
     def _parse_keywords(self, response: str) -> Dict[str, Any]:
@@ -85,8 +94,8 @@ class Document:
 class FetchingAgent:
     """Agent responsible for fetching relevant docs from the kanoon api"""
     
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, llms):
+        self.llms = llms
         print("initialised kanoon fetcher...")
         # super().__init__(**kwargs)
 
@@ -141,7 +150,7 @@ class FetchingAgent:
         ]
 
         # Extract Keywords
-        agent = KeywordExtractorAgent(documents=documents, llm=self.llm)
+        agent = KeywordExtractorAgent(documents=documents, llms=self.llms)
         keywords_result = await agent.extract_keywords(user_case=state["messages"][-1].content)  # Await the coroutine
 
         # Step 2: Use Extracted Keywords for Searching Relevant Cases
