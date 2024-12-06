@@ -67,7 +67,7 @@ Whoever, by words, either spoken or intended to be read, or by signs or visible 
 
 Section 66A, IT Act (Cyber Harassment):
 Punishment for sending offensive messages through communication service, etc., which cause annoyance or insult.
-""", height=300)
+""", height=200)
 
 
 def parse_current_and_message(content: str):
