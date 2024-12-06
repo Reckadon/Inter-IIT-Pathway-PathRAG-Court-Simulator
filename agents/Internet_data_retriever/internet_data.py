@@ -46,7 +46,7 @@ class DataRetrievalCrew:
             process=Process.sequential,
         )
 
-        result = crew1.kickoff()
+        result = crew1.kickoff_async()
         return result
 
         # if 'yes' in str(result).lower()[:10]:

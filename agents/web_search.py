@@ -7,8 +7,8 @@ class WebSearcherAgent:
         self.data_retriever_crew = DataRetrievalCrew
         self.llm = llm
 
-    def process(self, state: AgentState) -> AgentState:
-        result = self.data_retriever_crew(state["messages"][-1].content, llm=self.llm).run()
+    async def process(self, state: AgentState) -> AgentState:
+        result = await self.data_retriever_crew(state["messages"][-1].content, llm=self.llm).run()
         # print(result)
         # print(type(result))
         return {
