@@ -42,7 +42,19 @@ _Use the same name as above_, this will expose the backend FastAPI server at por
 
 ### Problem Solved: 🎯
 
-//TODO
+1. **Preparing for Legal Cases**
+
+   - **Problem**: Preparing for a court case involves analyzing previous cases, predicting arguments, and anticipating the course of proceedings, which can be overwhelming.
+   - **Solution**: By simulating court proceedings based on user-provided case descriptions and files, the system helps users practice and prepare for real-world legal scenarios, providing insights into potential arguments, counterarguments, and outcomes.
+
+1. **Educational Tool for Legal Understanding**
+
+   - **Problem**: Many individuals lack exposure to how courts operate, leading to confusion and anxiety about legal proceedings.
+   - **Solution**: The system provides an educational platform where users can interactively learn about court processes, understand legal principles, and explore how different factors influence verdicts.
+
+1. **Accessible Legal Expertise**
+   - **Problem**: Access to professional legal expertise is often expensive and not always feasible for all individuals, especially for preliminary case evaluations.
+   - **Solution**: By simulating courtroom interactions with intelligent agents, the application provides users with a preliminary understanding of their case, enabling informed decisions without immediate legal consultation.
 
 ## References
 
