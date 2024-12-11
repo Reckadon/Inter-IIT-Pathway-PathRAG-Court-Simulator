@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 import os
 from langchain_core.messages.utils import get_buffer_string
+import re
 
 
 from dotenv import load_dotenv
@@ -39,7 +40,7 @@ you will go through the following chain of thought steps:
 3. Assess if information from the web is required
 4. Argument construction
 
-Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
+IMPORTANT NOTE: Do only 'current_task' at a time, other task will be done in next steps or other agents. Do not confuse with precedent cases. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
@@ -102,7 +103,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         return response
     
     def is_web_search_needed(self, content: str) -> Literal["self", "web_searcher"]:
-        if "none" in content.lower():
+        if re.search(r"none", content, re.IGNORECASE):
             return "self"
         else:
             return "web_searcher"

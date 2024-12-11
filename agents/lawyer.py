@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional, Literal, TypedDict
 from langchain_core.messages import HumanMessage
 from langchain.tools import BaseTool
 from .base import AgentState
-
+import re
 
 
 class LawyerAgent:
@@ -33,7 +33,7 @@ you will go through the following chain of thought steps:
     <user input>
 5. Argument refinement based on feedback
 
-Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
+IMPORTANT NOTE: Do only 'current_task' at a time, other task will be done in next steps or other agents. Do not confuse with precedent cases. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
@@ -52,7 +52,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         
         messages = [
             {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
-        ] + state["messages"]
+        ] + state["messages"] 
 
         for i,llm in enumerate(self.llms):
             try:
@@ -104,7 +104,7 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         return response
     
     def is_web_search_needed(self, content: str) -> Literal["self", "web_searcher"]:
-        if "none" in content.lower():
+        if re.search(r"none", content, re.IGNORECASE):
             return "self"
         else:
             return "web_searcher"
