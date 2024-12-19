@@ -11,6 +11,7 @@ from langchain_core.messages.utils import get_buffer_string
 import os
 from dotenv import load_dotenv
 load_dotenv()
+import re
 
 
 def create_law_retriever(private=False) -> BaseTool:
@@ -61,7 +62,7 @@ you will go through the following chain of thought steps:
 3. Assess the retrieved results.
 4. Provide accurate excerpts of information
 
-Do only current task at a time. Avoid very long responses.
+IMPORTANT NOTE: Do only 'current_task' at a time, other task will be done in next steps or other agents. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
@@ -120,7 +121,7 @@ Do only current task at a time. Avoid very long responses.
                     continue
 
             #continue
-            if "not_enough" not in assessment.content.lower():
+            if not re.search(r"not_enough", assessment.content, re.IGNORECASE):
                 break
 
                 

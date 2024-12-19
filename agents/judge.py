@@ -3,7 +3,7 @@ from langchain_core.messages import HumanMessage
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 from agents.base import AgentState
-
+import re
 
 # class JudgeDecision(BaseModel):
 #     """Judge's structured decision output"""
@@ -42,7 +42,7 @@ you will go through the following chain of thought steps:
 5. give response based on above steps
 6. determine next speaker
 
-Do only current task at a time. Do not confuse with precedent cases. Avoid very long responses.
+IMPORTANT NOTE: Do ONLY 'current_task', other task will be done in next steps or other agents. Do not confuse with precedent cases. Avoid very long responses.
 """
 
     def get_thought_steps(self) -> List[str]:
@@ -75,9 +75,9 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         
         # Prepare messages for LLM processing
         messages = [
-            {"role": "system", "content": self.system_prompt + "\n'current_task': " + self.get_thought_steps()[state["thought_step"]]}
-        ] + state["messages"]
-
+            {"role": "system", "content": self.system_prompt}
+        ] + state["messages"] + [{"role": "system", "content": f"current_task: {self.get_thought_steps()[state['thought_step']]}" }]
+        # print(messages)
         # Process through LLMs with fallback mechanism
         # if state["thought_step"] != 4:
         for i, llm in enumerate(self.llms):
@@ -151,10 +151,9 @@ Do only current task at a time. Do not confuse with precedent cases. Avoid very 
         """
         Determines the next speaker based on the content.
         """
-        if "lawyer" in content.lower():
+        if re.search(r"lawyer", content, re.IGNORECASE):
             return "lawyer"
-        elif "END" in content.lower():
+        if re.search(r"END", content, re.IGNORECASE):
             return "END"
         else:
             return "prosecutor"
-   
