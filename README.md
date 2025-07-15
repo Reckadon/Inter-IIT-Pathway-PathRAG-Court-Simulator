@@ -1,5 +1,6 @@
 # PathRAG Court
 
+_Full Project Report [here](./project_report.pdf)_
 ---
 
 [![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
